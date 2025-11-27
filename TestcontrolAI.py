@@ -261,16 +261,15 @@ def create_sim_scene(sim_time_step=0.01):
         raise FileNotFoundError(f"SDF file not found: {SCENE_SDF_FILENAME}")
 
     meshcat = StartMeshcat()
-    meshcat.Delete(); meshcat.DeleteAddedControls()
 
     builder = DiagramBuilder()
     plant, scene_graph = AddMultibodyPlantSceneGraph(builder, time_step=sim_time_step)
     parser = Parser(plant)
     # load scene (table + cylinder)
-    parser.AddModelsFromUrl("file://" + os.path.abspath(SCENE_SDF_FILENAME))
+    parser.AddModels("file://" + os.path.abspath(SCENE_SDF_FILENAME))
     # load robot URDF if available
     if os.path.exists(ROBOT_URDF_PATH):
-        parser.AddModelsFromUrl("file://" + os.path.abspath(ROBOT_URDF_PATH))
+        parser.AddModels("file://" + os.path.abspath(ROBOT_URDF_PATH))
     else:
         print("[Warning] Robot URDF path not found:", ROBOT_URDF_PATH)
 
