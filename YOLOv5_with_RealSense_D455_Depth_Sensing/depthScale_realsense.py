@@ -67,11 +67,12 @@ while True:
 
         # Draw the bounding box
         cv2.putText(color_image, label, (int(x1), int(y1)-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (252, 119, 30), 2)
-
+        object_positions={}
+        object_positions[int(class_id)]=(X,Y,Z)
         # Print the object's class and distance
         print(f"{model.names[int(class_id)]}: {object_depth:.2f}m")
-        print(f"{model.names[int(class_id)]}:X={X},Y={Y},Z{Z}")
-
+        print(f"{model.names[int(class_id)]}:X={X},Y={Y},Z={Z}")
+        
     # Show the image
     cv2.imshow("Color Image", color_image)
     cv2.waitKey(1)
