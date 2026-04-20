@@ -1,0 +1,79 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+  <world name="pick_and_place_sorting_world">
+    <!-- Floor -->
+    <include>
+      <uri>file://../models/objects_scenes/floor.sdf</uri>
+    </include>
+
+    <!-- Table agrandie ~3.5x : 0.4x0.75 -> 1.4x2.5, recentrée sous le robot -->
+    <model name="table_source">
+      <static>true</static>
+      <pose>0.7 0 0.025 0 0 0</pose>
+      <link name="table_source_top_link">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>1.4 2.5 0.05</size>
+            </box>
+          </geometry>
+          <material>
+            <diffuse>0.82 0.71 0.55 1.0</diffuse>
+            <specular>0.2 0.2 0.2 1.0</specular>
+          </material>
+        </visual>
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>1.4 2.5 0.05</size>
+            </box>
+          </geometry>
+          <drake:proximity_properties>
+            <drake:mu_dynamic>0.5</drake:mu_dynamic>
+            <drake:mu_static>0.6</drake:mu_static>
+          </drake:proximity_properties>
+        </collision>
+      </link>
+    </model>
+      
+      
+    <model name="cube">
+      <pose>0.25 0 0.075 0 0 0</pose>
+      <static>false</static>
+      <link name="link">
+        <inertial>
+          <mass>0.5</mass>
+           <!--<inertia>
+            <ixx>5e-5</ixx>
+            <iyy>5e-5</iyy>
+            <izz>5e-5</izz>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyz>0</iyz>
+          </inertia>-->
+        </inertial>
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.1 0.1 0.1</size>
+            </box>
+          </geometry>
+          <drake:proximity_properties>
+            <drake:mu_dynamic>0.5</drake:mu_dynamic>
+            <drake:mu_static>0.6</drake:mu_static>
+          </drake:proximity_properties>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.1 0.1 0.1</size>
+            </box>
+          </geometry>
+          <material>
+            <diffuse>0.2 0.8 0.2 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+  </world>
+</sdf>
