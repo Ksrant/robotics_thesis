@@ -1,0 +1,133 @@
+# Contexte de mémoire — Manipulation par poussée non-préhensile avec perception RGB-D
+
+## Sujet du mémoire
+
+Je travaille sur la **manipulation par poussée non-préhensile** (non-prehensile pushing) avec un robot Franka Panda simulé dans **Drake (Python)**. L'objectif est de pousser un objet vers une position cible en utilisant la sphère montée sur le poignet comme end-effector, sans jamais saisir l'objet.
+
+---
+
+## Architecture du système
+
+### Simulation
+- **Robot** : Franka Panda 7 DOF, URDF `panda_arm_hand_sphere.urdf` (sphère de rayon 5cm sur panda_hand)
+- **Objet** : cube 10x10x10cm, joint flottant 7-DOF dans Drake
+- **Simulateur** : Drake avec `AddMultibodyPlantSceneGraph`, pas de temps 1ms
+- **Visualisation** : Meshcat
+
+### Perception (script 1 — avec caméra)
+- Caméra **RGB-D eye-in-hand** montée sur `panda_hand` (RgbdSensor Drake)
+- Pose caméra : `X_WC = X_WH(q) * X_BC` calculée par FK à chaque frame
+- Détection du cube : segmentation couleur **HSV** (cube vert, H=[35,85])
+- Rétroprojection pixel+depth → 3D dans le repère monde
+- **Filtre de Kalman 4D** sur état [x, y, vx, vy] du cube
+- Anti-divergence Kalman : amortissement progressif de la vitesse lors des frames manquées (FAIL), gel complet après 10 frames → empêche la dérive observée (0.3m → 0.8m en 3s)
+
+### Contrôleur (commun aux deux scripts)
+**Machine à états FSM** : APPROACH → PUSH → REPOSITION → DONE
+
+**État APPROACH / REPOSITION** : suivi de waypoints par contrôleur PD cartésien
+```
+F = Kp*(WP - p_sph) - Kd*v_sph
+τ = Jᵛᵀ·F − g_arm
+```
+
+**État PUSH** : contrôleur hybride force/vitesse
+```
+v_cmd = v_tangential + v_normal_PI
+```
+- `v_tangential` : vitesse libre le long de la face (direction corrigée)
+- `v_normal` : régulateur PI sur fn → maintient fn = FN_DESIRED = 2N même quand V_push augmente
+
+**Correction de direction de poussée** (feedback py) :
+```
+delta_f       = arctan(ft_filt / fn_filt)
+py_estimated  = c² * ft_filt / fn_filt      # c² = 2*CUBE_HALF²/3 ≈ 1.67e-3 m²
+theta_push    = theta_desired + K_F*delta_f + K_C*py_estimated
+```
+→ py est l'offset latéral du point de contact, estimé depuis la force sans capteur tactile
+
+**Modèle de contact physique** (FIX-A) :
+```
+fn = K_NORMAL * pénétration                          # force normale
+ft = clip(-K_TANGENT * v_lat, ±μ*fn)                # friction latérale, cône de Coulomb
+```
+La force n'est PLUS calculée dans push_dir (erreur de l'ancien code) mais décomposée en fn/ft séparés.
+
+**Détection de contact** (3 sources OR) :
+1. Géométrique : `d_contact = (p_sph - face_center) @ face_normal < SPHERE_RADIUS + 5mm` (p_sph exacte depuis FK)
+2. Force estimée : `fn_filt >= F_MIN`
+3. Force Drake réelle : `fn_drake > F_MIN` (depuis ContactResults)
+
+**Suivi de progression** : `_no_contact_t` décrémenté si le cube avance vers la cible → empêche les repositionnements prématurés
+
+---
+
+## Option 1 — Validation via Drake ContactResults
+
+- Port `contact_results` connecté à `plant.get_contact_results_output_port()`
+- `_extract_drake_contact()` lit la force réelle sur `panda_hand` au contact avec le cube
+- `n_real = f_on_hand_xy / |f_on_hand_xy|` → normale de contact valide pour **tout objet** (pas seulement le cube axis-aligned)
+- Log de comparaison `fn_estimé` vs `fn_réel` → graphe `figures/force_validation.png`
+- Priorité : Drake quand disponible, estimateur géométrique en fallback
+
+---
+
+## Deux scripts disponibles
+
+**Script A** (`push_force_feedback_complete.py`) — script de base sans caméra
+- Pose du cube lue directement depuis l'état Drake (vérité terrain)
+- Contient tous les correctifs FIX-A à FIX-F
+- ContactResults connecté pour la validation et le feedback force
+
+**Script B** (`push_contact_validated.py`) — script avec caméra RGB-D eye-in-hand
+- Perception visuelle réelle (segmentation HSV + Kalman + FK)
+- Même contrôleur que Script A
+- ContactResults pour la validation de l'estimateur
+
+---
+
+## Références clés
+
+- **[1]** Lynch & Mason (1996) — modèle quasi-statique, limit surface, `ft/fn = py/c²`
+- **[2]** Hogan & Rodriguez (2016) — feedback hybride force/vitesse, modes sticking/sliding
+- **[3]** Bauza, Hogan, Rodriguez (2018) — variables fn, ft, py du système pusher-slider
+- **[4]** Hou & Mason (2019) — contrôle hybride force/vitesse robuste, ICRA
+
+---
+
+## Ce que je veux faire ensuite
+
+1. **Généralisation à des objets non-cubiques** : remplacer `best_face_normal()` (axis-aligned) par `n_real` depuis Drake (déjà implémenté), et remplacer la détection HSV par une estimation de pose 6D (FoundationPose, détection par contour de profondeur, ou segmentation sans hypothèse de couleur)
+
+2. **Contact stable à haute vitesse** : le régulateur PI sur fn est implémenté — à valider expérimentalement en augmentant V_PUSH progressivement et en vérifiant que fn reste à FN_DESIRED = 2N
+
+3. **Capteur tactile** (optionnel) : ajouter un capteur F/T au poignet comme source de fn/ft, remplaçant l'estimateur géométrique — même interface que Drake ContactResults, même code en dessous
+
+4. **Validation quantitative** : utiliser le graphe `force_validation.png` pour mesurer l'erreur |fn_estimé - fn_réel| et |ft_estimé - ft_réel| en fonction du temps
+
+---
+
+## Paramètres importants
+
+```python
+SPHERE_RADIUS    = 0.05     # m
+CUBE_HALF        = 0.05     # m
+C_SQ             = 1.67e-3  # m²  (rayon de giration carré du cube)
+FN_DESIRED       = 2.0      # N   (force normale cible)
+V_PUSH           = 0.04     # m/s (vitesse tangentielle nominale)
+K_F              = 0.15     # gain feedback delta_f
+K_C              = 0.10     # gain feedback py
+K_LAT            = 1.5      # correction latérale
+NO_CONTACT_TIMEOUT = 5.0    # s
+DONE_THRESHOLD   = 0.01     # m
+MU_PUSHER        = 0.3      # coefficient friction pousseur-objet
+```
+
+---
+
+## Questions ouvertes / à discuter
+
+- Comment estimer `c²` pour un objet de forme inconnue ? (identification en ligne, ou depuis CAO)
+- Comment remplacer la segmentation HSV par une méthode générique pour des objets quelconques ?
+- Sim-to-real : comment `n_real` depuis Drake est remplacé par un vrai capteur F/T ?
+- La relation `ft/fn = py/c²` tient-elle pour des objets non-carrés ?
