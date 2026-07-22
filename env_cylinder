@@ -20,21 +20,23 @@
       </link>
     </model>
     <model name="object">
-      <pose>0.25 0.05 0.075 0 0 0</pose>
+      <pose>0.15 0.05 0.075 0 0 0</pose>
       <link name="object_link">
         <inertial>
-          <mass>0.2</mass>
+          <mass>0.4</mass>
           <inertia>
-            <ixx>0.00029167</ixx><iyy>0.00029167</iyy><izz>0.00025000</izz>
+            <ixx>0.00133333</ixx>
+            <iyy>0.00133333</iyy>
+            <izz>0.00200000</izz>
             <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
           </inertia>
         </inertial>
         <visual name="object_visual">
-          <geometry><cylinder><radius>0.05</radius><length>0.1</length></cylinder></geometry>
+          <geometry><cylinder><radius>0.1</radius><length>0.1</length></cylinder></geometry>
           <material><diffuse>0.85 0.35 0.25 1.0</diffuse></material>
         </visual>
         <collision name="object_collision">
-          <geometry><cylinder><radius>0.05</radius><length>0.1</length></cylinder></geometry>
+          <geometry><cylinder><radius>0.1</radius><length>0.1</length></cylinder></geometry>
           <surface>
             <friction>
               <ode><mu>0.8</mu><mu2>0.8</mu2></ode>
@@ -44,7 +46,7 @@
       </link>
     </model>
     <model name="cylinder_target">
-      <pose>0.8 0.35 0.075 0 0 0</pose>
+      <pose>0.3 0.4 0.075 0 0 0</pose>
       <static>true</static>
       <link name="link">
         <inertial>
