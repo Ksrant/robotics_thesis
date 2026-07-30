@@ -1,0 +1,1227 @@
+"""
+cube_push_perc.py
+────────────────────────────────────────────────────────────────────────────
+Reactive push controller — architecture faithful to the Methodology chapter
+of the thesis (Heins et al. 2023 + lateral centering), generalized to
+convex primitives (cube/rectangle, cylinder).
+
+This version consolidates every fix validated during debugging sessions:
+  - Initial object position read from Drake's default context (always
+    reflects the SDF's actual <pose>, regardless of what the caller passes
+    as an argument).
+  - Correct sign convention for contact_force() (Drake returns the force
+    on body B of the pair; the right inversion is needed depending on
+    which body — hand or object — plays the role of A or B).
+  - Wrist link collision: all 4 wrist links (panda_link5-8) are excluded
+    from colliding with the object. A narrower exclusion (panda_link8
+    only, to let the forearm visually collide with the object for
+    realism) was tried and reverted: _measure_force() only measures/
+    corrects contact forces between the object and panda_hand/panda_link8
+    — if link5/6/7 are allowed to touch the object, Drake integrates that
+    force into the real physics (the object moves) but the controller
+    never sees it and can't correct for it. This produced unpredictable,
+    position-dependent divergence on the cylinder. See the constant's
+    comment below for the exact empirical signature and how to safely
+    re-narrow the exclusion for a one-off visual demo.
+  - Forward speed profile that decelerates progressively before the
+    target (wide braking zone + floor speed), decoupled from the lateral
+    centering term, which stays at full strength at all times.
+  - Targeted damping of the object's own EXCESS velocity (never its
+    legitimate velocity), computed at the correct time step (1 kHz, in
+    _update(), not in the 1 Hz log).
+  - Widened tolerance margin on the fallback mechanisms (prolonged lost
+    contact / stall) to accept a stop close to the target without
+    crossing the strict success threshold.
+  - Cube/rectangle: the active face axis is FROZEN at planning time
+    (_plan_approach / _plan_reposition), and only the object's OWN
+    rotation (theta_o, if the cube genuinely rotates) turns it afterward
+    — it is never re-chosen from d_hat on every tick anymore. Bug fixed:
+    re-choosing from d_hat exposes the controller to a face flip if the
+    object overshoots the target (d_hat reverses), with no actual object
+    rotation to justify it — this was the cause of the instability
+    observed at the end of a push (a jump of several cm in a single time
+    step, followed by a stall / failed reposition).
+  - Rectangle: independent half_extent_x / half_extent_y (instead of a
+    single half_extent assuming a square cube). The center→face distance
+    used for planning, geometric force measurement, and contact detection
+    is now computed via _current_face_offset(), which picks the right
+    half-side depending on the active face's axis — cylinder unaffected
+    (always half_extent = radius).
+  - Directional low-pass filter (D_HAT_BETA) on d_hat, to prevent the
+    "flick" observed empirically near the target (d_hat can rotate by
+    more than 140° in ~1s if the object slightly overshoots — this used
+    to flip the cylinder's push direction and K_LAT's lateral correction
+    almost instantly, producing a sudden jump and a force reading pinned
+    at the geometric fallback's ceiling). K_LAT itself is not attenuated
+    by this filter — only the direction it acts on is stabilized.
+  - DONE_THRESHOLD set to 25mm — physically justified (see the constant's
+    comment): stays above WAYPOINT_THRESHOLD (the Cartesian position
+    controller's own precision floor elsewhere in the FSM) and stays
+    small relative to the tested objects (~25% of the cylinder's radius,
+    ~33% of the cube's half-side).
+  - final_dist_mm is recomputed from the actual final simulation state in
+    run_trial(), not trusted from the controller's internal cache — the
+    cached value can go stale if a trial ends in REPOSITION/APPROACH, or
+    even in DONE if the active retract phase keeps moving the object
+    while contact force stays pinned at the fallback estimator's ceiling.
+
+ARCHITECTURE (see thesis §4.6-4.7)
+──────────────────────────────────────
+  Objective 1 — Where to push on the object's geometry:
+      → get_approach_direction() chooses the face/approach direction
+        (cube: nearest face normal, accounting for yaw; cylinder:
+        continuous radial direction).
+      → The lateral centering term (§4.7.2) keeps the contact point
+        centered on that face throughout the push.
+
+  Objective 2 — How to command the end-effector to reach that velocity:
+      → v_cmd (Cartesian) → impedance → F_trans = Kv(v_cmd - v_sph)
+      → τ = Jv^T F_trans - g(q), saturated at the Franka's motor limits.
+
+  Objective 3 — Regulate the command and confirm contact:
+      → The push direction is corrected by force feedback (Heins' law,
+        §4.7.1).
+      → Admittance saturation + the braking profile regulate the command
+        without a separate PI loop.
+      → Contact is confirmed by Drake (primary source) or geometric
+        penetration (fallback) — always on the object's REAL position,
+        never the perceived one (a force sensor is not a camera).
+"""
+
+import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "tutorial_scripts"))
+import numpy as np
+import matplotlib.pyplot as plt
+from pydrake.geometry import StartMeshcat, CollisionFilterDeclaration, GeometrySet
+from pydrake.math import RigidTransform, RotationMatrix
+from pydrake.multibody.parsing import Parser
+from pydrake.multibody.plant import AddMultibodyPlantSceneGraph, ContactResults
+from pydrake.common.value import AbstractValue
+from pydrake.systems.analysis import Simulator
+from pydrake.systems.framework import DiagramBuilder, LeafSystem
+from pydrake.systems.primitives import ConstantVectorSource, LogVectorOutput
+from pydrake.multibody.tree import JacobianWrtVariable
+from pydrake.visualization import AddDefaultVisualization
+from helper.dynamics import CalcRobotDynamics
+from cameramodel2 import CameraModel
+ROBOT_URDF_PATH = os.path.join("..", "models", "descriptions", "robots", "arms",
+                                "franka_description", "urdf", "panda_arm_hand_sphere.urdf")
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  DEBUG
+# ═══════════════════════════════════════════════════════════════════════════
+DEBUG_VERBOSE = False   # set to True for diagnostic prints (δf, v_xy_norm...)
+                        # LEAVE FALSE for benchmark.py — otherwise dozens of
+                        # runs generate tens of thousands of log lines.
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  GEOMETRY AND WORKSPACE
+# ═══════════════════════════════════════════════════════════════════════════
+FINGER_TIP_OFFSET   = np.array([0.0, 0.0, 0.0])
+
+# WARNING: this is a PLANNING parameter in this script — it must match
+# EXACTLY the radius of the collision geometry actually defined in
+# panda_arm_hand_sphere.urdf (the sphere attached to panda_hand). Changing
+# this value here WITHOUT also editing the radius in the URDF changes
+# NOTHING about the real physical size of the sphere in simulation — only
+# the planned approach/contact point calculations, which then become
+# inconsistent with the real geometry (confirmed empirically: sphere
+# reduced to 0.02 here without updating the URDF, still at 0.05 →
+# excessive penetration, unreliable Drake ContactResults, geometric
+# fallback saturated at K_NORMAL*0.02=14N continuously). Reset to 0.05 to
+# stay consistent with the current URDF. For a physically smaller sphere:
+# edit <sphere radius="..."/> in the URDF FIRST, THEN carry the same value
+# over here.
+SPHERE_RADIUS       = 0.05
+TABLE_TOP_Z         = 0.050
+Z_PUSH              = TABLE_TOP_Z + SPHERE_RADIUS
+Z_FLOOR             = Z_PUSH - 0.003
+ROBOT_BASE_OFFSET   = RigidTransform(RotationMatrix.Identity(), [-0.10, 0.0, 0.0])
+ROBOT_BASE_XY       = np.array([-0.10, 0.0])
+FRANKA_MAX_REACH_XY = 0.75   # safety margin (real reach ~0.85m)
+
+DEFAULT_OBJECT_POS    = np.array([0.35, 0.1, 0.075])
+DEFAULT_OBJECT_TARGET = np.array([0.55, 0.1])
+
+# Wrist link(s) to exclude from any collision with the object.
+#
+# WARNING — reverted to excluding all 4 links (validated historical
+# behavior), NOT just panda_link8. Reason: _measure_force() only
+# measures/corrects contacts between the object and panda_hand/
+# panda_link8 (self._hand_indices) — if panda_link5/6/7 are allowed to
+# touch the object (as in a previous iteration, cubetest.py), Drake still
+# integrates that force into the real physics (the object moves), but the
+# controller never sees it and can therefore never correct for it. This
+# produced unpredictable, position-dependent divergence on a cylinder
+# (m0.5/μ0.7, oblique position) even though the exact same configuration
+# worked perfectly with all 4 links excluded — typical signature:
+# measured |f|=0.00N right before a jump of several cm in a single time
+# step, followed by a force that plateaus exactly at
+# K_NORMAL*pen_max=14.0N (geometric fallback saturated after the fact).
+#
+# For a one-off visual demo where forearm realism matters more than
+# statistical reliability (e.g. a Meshcat render of the cube), you can
+# temporarily set this back to just ["panda_link8"] — but do NOT use that
+# for a benchmark campaign as long as _measure_force() doesn't account
+# for those links.
+WRIST_LINKS_NO_OBJECT_COLLISION = ["panda_link5", "panda_link6", "panda_link7", "panda_link8"]
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  CONTROLLER PARAMETERS (see thesis, Table 4.1)
+# ═══════════════════════════════════════════════════════════════════════════
+V_PUSH   = 0.06     # m/s — nominal push speed (far from the target)
+V_MIN_CREEP = 0.008 # m/s — floor speed during final approach
+BRAKE_RADIUS = 0.35 # m — distance from which forward speed decelerates
+                     #     progressively (square-root profile)
+
+F_MIN    = 0.05     # N  — contact detection threshold
+F_MAX    = 30.0     # N  — admittance saturation
+BETA     = 0.30     # low-pass filter coefficient on force
+
+D_HAT_BETA = 0.08   # low-pass filter coefficient on the desired direction
+                     # d_hat (hence theta_d, n_d, and the cylinder's
+                     # face_normal). Noticeably slower than BETA (force):
+                     # the empirically observed "flick" (d_hat can rotate
+                     # by more than 140° in ~1s when the object slightly
+                     # overshoots the target) plays out on the timescale
+                     # of a second, not a millisecond — too fast a filter
+                     # would not damp it. K_LAT is NOT attenuated by this
+                     # filter (stays at full strength): only the direction
+                     # it acts on is stabilized. Empirically tuned value —
+                     # if the flick persists, lower further; if the
+                     # controller becomes too slow to react to a genuine
+                     # direction change (e.g. right after a REPOSITION),
+                     # raise it slightly.
+
+THETA_O_BETA = 0.05  # low-pass filter coefficient on the object's own yaw
+                     # (theta_o), used ONLY to rotate the cube's frozen
+                     # face_normal (R @ self._cube_face_base). Same spirit
+                     # as D_HAT_BETA, but for a DIFFERENT instability
+                     # channel: the object's real physical rotation, not
+                     # the desired-direction vector. Motivated by a
+                     # physical argument, not just empirical tuning: the
+                     # cube's rotational inertia scales with c² = 2a²/3
+                     # (a = half-side) — a smaller cube (e.g. a=0.075)
+                     # has much less rotational inertia than a larger one
+                     # (e.g. a=0.10) for the same mass, so the same
+                     # off-center contact torque spins it faster. Without
+                     # filtering, a fast real rotation makes face_normal
+                     # swing with it every tick, contaminating eps_lat
+                     # (lateral centering) and the geometric force
+                     # fallback — observed empirically as a multi-second
+                     # drift away from the target (distinct from the
+                     # cylinder's instantaneous d_hat-driven flick) that
+                     # got dramatically worse when half_extent was reduced
+                     # from 0.10 to 0.075 with mass held constant. Slower
+                     # than D_HAT_BETA as a starting point since real
+                     # object rotation should be trusted less abruptly
+                     # than the target-direction vector; tune empirically
+                     # like D_HAT_BETA.
+
+K_F   = 0.15   # angular correction gain (Heins' law, coefficient (K_F+1))
+K_C   = 0.10   # correction gain on the geometric offset delta_c
+K_LAT = 1.5    # lateral centering term gain — NEVER attenuated near the
+               # target (decoupled from the braking profile, see the
+               # discussion: attenuating K_LAT degrades final accuracy at
+               # the worst possible moment)
+
+V_OBJ_DAMPING = 0.8   # damps ONLY the object's EXCESS velocity relative to
+                       # what the braking profile allows — never its
+                       # legitimate velocity (the "raw" V_OBJ_DAMPING trap
+                       # identified during debugging: fights progress)
+
+V_XY_HARD_CAP = 3.0 * V_PUSH   # generic safety cap, independent of any
+                                # force estimate — prevents a future
+                                # calculation bug (e.g. wrong time step)
+                                # from generating an aberrant velocity
+                                # command
+
+Kp_pos = 400.0   # Cartesian position gain (APPROACH/REPOSITION)
+Kd_pos = 80.0    # Cartesian damping gain
+Kv     = 600.0   # velocity impedance gain (PUSH)
+
+APPROACH_Z         = 0.50
+WAYPOINT_THRESHOLD = 0.020
+WAYPOINT_TIMEOUT   = 8.0    # s — safety net if a waypoint is unreachable
+
+DONE_THRESHOLD       = 0.025  # m — strict success condition. This value is
+                               # justified by two constraints: (1) it stays
+                               # above WAYPOINT_THRESHOLD (20mm, the
+                               # Cartesian position controller's own
+                               # precision floor elsewhere in the FSM —
+                               # going below it would ask the push task for
+                               # more precision than the position
+                               # controller itself provides); (2) it stays
+                               # small relative to the tested objects
+                               # (~25% of the cylinder's radius R=0.10m,
+                               # ~33% of the cube's half-side 0.075m) — not
+                               # an artificially inflated tolerance meant
+                               # to prop up the success rate.
+DONE_TOLERANCE_RATIO = 2.0    # multiplier applied as a fallback (prolonged
+                               # lost contact / stall): a stop within
+                               # DONE_THRESHOLD*2 of the target is accepted
+                               # rather than forcing a costly
+                               # repositioning for a marginal accuracy gain
+NO_CONTACT_TIMEOUT = 5.0    # s
+STALL_TIMEOUT      = 4.0    # s — contact held but no progress
+STALL_MIN_PROGRESS = 0.001  # m
+
+RETREAT_DIST       = 0.10
+DONE_RETRACT_TIME  = 2.0
+DONE_RETRACT_SPEED = 0.04
+
+K_NORMAL             = 700.0   # N/m — contact stiffness (geometric estimator)
+CONTACT_DIST_MARGIN  = 0.005
+
+# Franka Panda joint torque limits (N·m) — answers Objective 2
+JOINT_TORQUE_LIMITS = np.array([87, 87, 87, 87, 12, 12, 12])
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  GEOMETRIC GENERALIZATION — Objective 1
+# ═══════════════════════════════════════════════════════════════════════════
+
+def best_face_normal(push_dir_xy, theta_o=0.0):
+    """
+    Cube/rectangle: normal of the face most opposed to the push direction,
+    accounting for the object's actual rotation (theta_o, yaw in
+    radians). Without this term, the implicit assumption is that the
+    object always stays aligned with the world axes — false as soon as it
+    tips over. Does NOT depend on the half-sides (just the choice of axis
+    [±1,0]/[0,±1]) — the actual distance to the face is computed
+    separately by PushController._current_face_offset().
+    """
+    base = np.array([[1, 0], [-1, 0], [0, 1], [0, -1]], float)
+    c, s = np.cos(theta_o), np.sin(theta_o)
+    R = np.array([[c, -s], [s, c]])
+    candidates = (R @ base.T).T
+    return candidates[np.argmin(candidates @ push_dir_xy)]
+
+
+def get_approach_direction(push_dir_xy, shape_type, theta_o=0.0):
+    """
+    Direction, from the object's center, toward the pusher's approach
+    point (i.e. opposite to push_dir_xy).
+      cube/rectangle: snaps to the nearest face axis, accounting for the
+                       object's actual yaw.
+      cylinder:        continuous radial direction (rotational symmetry).
+    """
+    if shape_type == "cube":
+        return best_face_normal(push_dir_xy, theta_o)
+    elif shape_type == "cylinder":
+        return -push_dir_xy / (np.linalg.norm(push_dir_xy) + 1e-9)
+    else:
+        raise ValueError(f"unknown shape_type: {shape_type}")
+
+
+def get_c_squared(shape_type, half_extent, half_extent_y=None):
+    """
+    Squared radius of gyration (Lynch & Mason 1996) — diagnostic only.
+      cylinder:       c² = R²/2
+      cube/rectangle: c² = (a²+b²)/3, a=half-side x, b=half-side y
+                       (reduces to 2a²/3 if a=b, the original square case).
+    """
+    if shape_type == "cube":
+        a = half_extent
+        b = half_extent_y if half_extent_y is not None else half_extent
+        return (a ** 2 + b ** 2) / 3.0
+    elif shape_type == "cylinder":
+        return half_extent ** 2 / 2.0
+    raise ValueError(f"unknown shape_type: {shape_type}")
+
+
+def contact_point_xy(object_pos_xy, face_normal, offset):
+    return object_pos_xy + (offset + SPHERE_RADIUS - 0.005) * face_normal
+
+
+def hover_point_xy(object_pos_xy, face_normal, offset):
+    """Hover point, progressively reduced if out of the arm's reach."""
+    for margin in (0.12, 0.08, 0.05, 0.02):
+        p = object_pos_xy + (offset + SPHERE_RADIUS + margin) * face_normal
+        if np.linalg.norm(p - ROBOT_BASE_XY) <= FRANKA_MAX_REACH_XY:
+            return p
+    dir_to_base = ROBOT_BASE_XY - object_pos_xy
+    safe_dir = dir_to_base / (np.linalg.norm(dir_to_base) + 1e-9)
+    return object_pos_xy + (offset + SPHERE_RADIUS + 0.05) * safe_dir
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  FSM STATES
+# ═══════════════════════════════════════════════════════════════════════════
+STATE_APPROACH   = "APPROACH"
+STATE_PUSH       = "PUSH"
+STATE_REPOSITION = "REPOSITION"
+STATE_DONE       = "DONE"
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  CONTROLLER
+# ═══════════════════════════════════════════════════════════════════════════
+class PushController(LeafSystem):
+
+    def __init__(self, plant, init_q7, shape_type="cube", half_extent=0.05,
+                 half_extent_y=None, object_model_name="object", object_pos=None,
+                 object_target=None, run_tag=None, camera_model=None):
+        super().__init__()
+        nq, nv = plant.num_positions(), plant.num_velocities()
+
+        self._state_port = self.DeclareVectorInputPort("Current_state", size=nq + nv)
+        self._desired_port = self.DeclareVectorInputPort("Desired_state", size=7)
+        self._contact_results_port = self.DeclareAbstractInputPort(
+            "contact_results", AbstractValue.Make(ContactResults()))
+        self._push_start_sph_xy = None
+        self.plant = plant
+        self.plant_context_ad = plant.CreateDefaultContext()
+        self._nq, self._nv = nq, nv
+
+        self.shape_type = shape_type
+        self._run_tag = run_tag
+        self._camera_model = camera_model   # None → absolute position (historical behavior)
+        # cylinder: half_extent = radius (half_extent_y ignored).
+        # cube/rectangle: half_extent = half-side X, half_extent_y = half-
+        # side Y (if None, square — unchanged historical behavior).
+        self.half_extent = half_extent
+        self.half_extent_x = half_extent
+        self.half_extent_y = half_extent_y if half_extent_y is not None else half_extent
+        self.c_sq = get_c_squared(shape_type, half_extent, self.half_extent_y)   # diagnostic only
+        self.object_pos = np.array(object_pos) if object_pos is not None else DEFAULT_OBJECT_POS.copy()
+        self.object_target = np.array(object_target) if object_target is not None else DEFAULT_OBJECT_TARGET.copy()
+
+        self._panda_model = plant.GetModelInstanceByName("panda")
+        vel_idx = []
+        for ji in plant.GetJointIndices(self._panda_model):
+            jt = plant.get_joint(ji)
+            if jt.num_velocities() > 0:
+                vel_idx.extend(range(jt.velocity_start(), jt.velocity_start() + jt.num_velocities()))
+        self._arm_vel_idx = np.array(vel_idx, dtype=int)
+
+        self._object_model = plant.GetModelInstanceByName(object_model_name)
+        obj_idx = []
+        for ji in plant.GetJointIndices(self._object_model):
+            jt = plant.get_joint(ji)
+            if jt.num_positions() > 0:
+                obj_idx.extend(range(jt.position_start(), jt.position_start() + jt.num_positions()))
+        self._object_pos_idx = np.array(obj_idx, dtype=int)
+
+        self._hand_body = plant.GetBodyByName("panda_hand")
+        self._object_body = self._find_first_body(plant, object_model_name)
+        self._hand_indices = {self._hand_body.index()}
+        try:
+            self._hand_indices.add(plant.GetBodyByName("panda_link8").index())
+        except Exception:
+            pass
+
+        # ── FSM / push state ──────────────────────────────────────────────
+        self._ctrl_state = STATE_APPROACH
+        self._waypoints = []
+        self._wp_idx = 0
+        self._wp_state_time = None
+
+        self._face_normal = np.zeros(2)   # geometric normal, ALWAYS known by construction
+        self._cube_face_base = None       # face axis frozen at planning time (cube only)
+        self._cube_theta_o_ref = 0.0      # object yaw at planning time (cube only)
+        self._fk_filt = np.zeros(2)       # filtered force vector (fx, fy), world frame
+        self._d_hat_filt = None           # filtered desired direction (anti-flick near target)
+        self._theta_o_filt_vec = None     # filtered object yaw, unit-vector form (cube only)
+        self._contact = False
+        self._no_contact_t = 0.0
+        self._stall_dist = None
+        self._stall_timer = 0.0
+        self._last_dist = None
+
+        self._prev_object_xy = None       # for estimating the object's own velocity
+        self._v_obj_filt = np.zeros(2)
+
+        self._done_time = None
+        self._done_sim_time = None
+        self._force_log = []
+
+        # ── Initial position: read from Drake's default context ───────────
+        # (always reflects the SDF's actual <pose>, regardless of what the
+        # caller may have passed as the object_pos argument — eliminates
+        # any risk of a plan/reality mismatch found during debugging).
+        plant.SetPositions(self.plant_context_ad, self._panda_model, np.array(init_q7))
+        q_default = plant.GetPositions(self.plant_context_ad, self._object_model)
+        if len(q_default) == 7:
+            true_object_xy = q_default[4:7][:2].copy()
+        else:
+            true_object_xy = self.object_pos[:2].copy()
+        self._obj_start_xy = true_object_xy.copy()   # reference for the theoretical trajectory
+        self._traj_log = []                            # trajectory log (object + pusher), throttled
+
+        p0, _ = self._get_sphere_center()
+        print(f"[Controller] shape={shape_type} half_extent=({self.half_extent_x},{self.half_extent_y}) "
+              f"c²={self.c_sq:.4f}  sphere_init={np.round(p0, 4)}")
+        if np.linalg.norm(true_object_xy - self.object_pos[:2]) > 1e-3:
+            print(f"[Controller] ⚠ actual Drake position {np.round(true_object_xy, 3)} "
+                  f"≠ object_pos given {np.round(self.object_pos[:2], 3)} — "
+                  f"planning uses the actual position.")
+        self._plan_approach(true_object_xy)
+
+        state_idx = self.DeclareDiscreteState(nv)
+        self.DeclareStateOutputPort("tau_u", state_idx)
+        self.DeclarePeriodicDiscreteUpdateEvent(1 / 1000, 0.0, self._update)
+        self.DeclarePeriodicPublishEvent(1, 0, self._log)
+
+    # ── utilities ─────────────────────────────────────────────────────────
+
+    def _find_first_body(self, plant, model_name):
+        model = plant.GetModelInstanceByName(model_name)
+        for bi in plant.GetBodyIndices(model):
+            b = plant.get_body(bi)
+            if b.name() != "world":
+                return b
+        return None
+
+    def _get_sphere_center(self):
+        ee = self.plant.GetFrameByName("panda_hand")
+        X_WE = self.plant.CalcRelativeTransform(self.plant_context_ad, self.plant.world_frame(), ee)
+        return X_WE.translation() + X_WE.rotation().matrix() @ FINGER_TIP_OFFSET, X_WE.rotation()
+
+    def _get_jacobians(self):
+        ee = self.plant.GetFrameByName("panda_hand")
+        J_full = self.plant.CalcJacobianSpatialVelocity(
+            self.plant_context_ad, JacobianWrtVariable.kV, ee, FINGER_TIP_OFFSET,
+            self.plant.world_frame(), self.plant.world_frame())
+        J = J_full[:, self._arm_vel_idx]
+        return J[:3, :], J[3:, :]
+
+    def _get_object_xy(self, q):
+        if len(self._object_pos_idx) == 7:
+            return q[self._object_pos_idx[4:7]][:2].copy()
+        return self.object_pos[:2].copy()
+
+    def _get_object_yaw(self, q):
+        """Object's actual yaw (useful for the cube), from Drake's quaternion."""
+        if len(self._object_pos_idx) == 7:
+            w, x, y, z = q[self._object_pos_idx[0:4]]
+            return float(np.arctan2(2 * (w * z + x * y), 1 - 2 * (y * y + z * z)))
+        return 0.0
+
+    def _current_face_offset(self):
+        """
+        Distance from the object's center to the active surface, along
+        self._face_normal (which is always axis-aligned: [±1,0] or [0,±1]
+        for the cube/rectangle).
+          cylinder:       constant radius (half_extent).
+          cube/rectangle: half_extent_x if the active face is along x,
+                           half_extent_y if along y — allows a rectangle
+                           with different half-sides.
+        """
+        if self.shape_type == "cylinder":
+            return self.half_extent
+        return (self.half_extent_x * abs(self._face_normal[0])
+                + self.half_extent_y * abs(self._face_normal[1]))
+
+    def _reset_push_state(self):
+        self._fk_filt = np.zeros(2)
+        self._d_hat_filt = None   # restarts from the raw direction on the new segment's first tick
+        self._theta_o_filt_vec = None   # same, for the object's own filtered yaw
+        self._contact = False
+        self._no_contact_t = 0.0
+        self._stall_dist = None
+        self._stall_timer = 0.0
+        self._wp_state_time = None
+        self._prev_object_xy = None
+        self._v_obj_filt = np.zeros(2)
+
+    # ── contact force: raw vector, NO fn/ft decomposition ───────────────────
+    # Objective 3: it is this vector (and its angle) that feeds Heins'
+    # law. Primary source = Drake ContactResults; fallback = geometric
+    # penetration along the known normal self._face_normal.
+    #
+    # Drake sign convention: PointPairContactInfo.contact_force() is the
+    # force applied ON BODY B of the pair (bodyB_index()). It must
+    # therefore be used directly if the object is body B, and inverted if
+    # the object is body A (in which case contact_force() is the force on
+    # the hand, not on the object).
+
+    def _measure_force(self, context, p_sph_xy, object_xy, near_object):
+        cr = self._contact_results_port.Eval(context)
+        n_contacts = cr.num_point_pair_contacts()
+        f_xy = np.zeros(2)
+        drake_ok = False
+
+        if n_contacts > 0 and self._object_body is not None:
+            obj_idx = self._object_body.index()
+            f_sum = np.zeros(3)
+            found = False
+            for i in range(n_contacts):
+                info = cr.point_pair_contact_info(i)
+                bA, bB = info.bodyA_index(), info.bodyB_index()
+                if bB == obj_idx and bA in self._hand_indices:
+                    f_sum += np.array(info.contact_force())     # force ON the object (body B)
+                    found = True
+                elif bA == obj_idx and bB in self._hand_indices:
+                    f_sum += -np.array(info.contact_force())    # contact_force() is on the hand (B) → invert
+                    found = True
+            if found and np.linalg.norm(f_sum[:2]) > 1e-4:
+                f_xy = f_sum[:2]
+                drake_ok = True
+
+        if not drake_ok and near_object:
+            # Geometric fallback: penetration along the known normal.
+            # -face_normal points toward the target (along the push) —
+            # consistent with the "force on the object" convention above.
+            # GATED behind near_object (a real, radius/geometry-based
+            # proximity check computed by the caller) — the signed
+            # distance along face_normal alone is a 1D half-space test:
+            # if face_normal is even slightly stale (e.g. right after the
+            # near-target "flick"), it can report near-maximal fake
+            # penetration even when the sphere has visibly separated
+            # laterally from the object (confirmed via Meshcat — sphere
+            # clearly off the cylinder, yet this fallback stayed pinned at
+            # K_NORMAL*0.02=14N for several seconds, keeping self._contact
+            # falsely True and letting the DONE retract phase shove the
+            # object further with no contact-awareness at all).
+            offset = self._current_face_offset()
+            face_center = object_xy + offset * self._face_normal
+            d_normal = float((p_sph_xy - face_center) @ self._face_normal)
+            pen = float(np.clip(SPHERE_RADIUS - d_normal, 0.0, 0.02))
+            f_xy = K_NORMAL * pen * (-self._face_normal)
+
+        return f_xy, drake_ok
+
+    # ── planning ──────────────────────────────────────────────────────────
+
+    def _plan_approach(self, object_pos_xy, theta_o=0.0):
+        push_dir = self.object_target - object_pos_xy
+        push_dir /= np.linalg.norm(push_dir) + 1e-9
+        self._push_plan_dir = push_dir.copy()
+        self._push_plan_dist = float(np.linalg.norm(self.object_target - object_pos_xy))
+        self._face_normal = get_approach_direction(push_dir, self.shape_type, theta_o)
+        if self.shape_type == "cube":
+            # Freeze the face axis chosen HERE (from push_dir at planning
+            # time) — it will never be re-chosen from d_hat during PUSH
+            # again (see _update: re-choosing from d_hat exposes the
+            # controller to a face flip if the object overshoots the
+            # target and d_hat reverses, with no actual object rotation
+            # to justify it).
+            self._cube_face_base = self._face_normal.copy()
+            self._cube_theta_o_ref = theta_o
+        self._reset_push_state()
+
+        offset = self._current_face_offset()
+        p_hover = hover_point_xy(object_pos_xy, self._face_normal, offset)
+        p_contact = contact_point_xy(object_pos_xy, self._face_normal, offset)
+        self._waypoints = [
+            np.array([p_hover[0], p_hover[1], APPROACH_Z]),
+            np.array([p_hover[0], p_hover[1], Z_PUSH]),
+            np.array([p_contact[0], p_contact[1], Z_PUSH]),
+        ]
+        self._wp_idx = 0
+        self._ctrl_state = STATE_APPROACH
+        print(f"\n[Plan] obj={np.round(object_pos_xy, 3)} push_dir={np.round(push_dir, 3)} "
+              f"approach={np.round(self._face_normal, 3)} ({self.shape_type})")
+
+    def _plan_reposition(self, object_pos_xy, p_sph_current, theta_o=0.0):
+        push_dir = self.object_target - object_pos_xy
+        push_dir /= np.linalg.norm(push_dir) + 1e-9
+        self._face_normal = get_approach_direction(push_dir, self.shape_type, theta_o)
+        if self.shape_type == "cube":
+            self._cube_face_base = self._face_normal.copy()
+            self._cube_theta_o_ref = theta_o
+        self._reset_push_state()
+
+        offset = self._current_face_offset()
+        retreat_xy = object_pos_xy + (offset + RETREAT_DIST) * self._face_normal
+        if np.linalg.norm(retreat_xy - ROBOT_BASE_XY) > FRANKA_MAX_REACH_XY:
+            for r in (0.08, 0.06, 0.04):
+                cand = object_pos_xy + (offset + r) * self._face_normal
+                if np.linalg.norm(cand - ROBOT_BASE_XY) <= FRANKA_MAX_REACH_XY:
+                    retreat_xy = cand
+                    break
+
+        p_hover = hover_point_xy(object_pos_xy, self._face_normal, offset)
+        p_contact = contact_point_xy(object_pos_xy, self._face_normal, offset)
+        self._waypoints = [
+            np.array([p_sph_current[0], p_sph_current[1], APPROACH_Z]),
+            np.array([retreat_xy[0], retreat_xy[1], APPROACH_Z]),
+            np.array([p_hover[0], p_hover[1], Z_PUSH]),
+            np.array([p_contact[0], p_contact[1], Z_PUSH]),
+        ]
+        self._wp_idx = 0
+        self._ctrl_state = STATE_REPOSITION
+        print(f"\n[Reposition] obj={np.round(object_pos_xy, 3)} approach={np.round(self._face_normal, 3)}")
+
+    # ── 1 kHz control loop ────────────────────────────────────────────────
+
+    def _update(self, context, discrete_state):
+        x = self._state_port.Eval(context)
+        nq, nv = self._nq, self._nv
+        t = context.get_time()
+
+        self.plant.SetPositions(self.plant_context_ad, x[:nq])
+        self.plant.SetVelocities(self.plant_context_ad, x[nq:])
+        _, Jv = self._get_jacobians()
+        p_sph, _ = self._get_sphere_center()
+        v_arm = x[nq + self._arm_vel_idx]
+        v_sph = Jv @ v_arm
+        g_arm = self.plant.CalcGravityGeneralizedForces(self.plant_context_ad)[self._arm_vel_idx]
+
+        # ── Ground truth vs perceived ──────────────────────────────────
+        # object_xy_true: real Drake position — used ONLY for force
+        # measurement, geometric contact detection, and final metrics
+        # (physical channels, independent of vision).
+        # object_xy: what the controller believes, and what it actually
+        # acts on — identical to object_xy_true if camera_model is None
+        # (historical behavior), otherwise sampled by the camera model
+        # (limited frame rate, latency, noise — see camera_model.py).
+        object_xy_true = self._get_object_xy(x[:nq])
+        if self._camera_model is not None:
+            object_xy = self._camera_model.sample(t, object_xy_true, in_contact=self._contact)
+        else:
+            object_xy = object_xy_true.copy()
+
+        theta_o = self._get_object_yaw(x[:nq])
+        F_floor = 1000.0 * max(0.0, Z_FLOOR - p_sph[2]) * np.array([0, 0, 1.0])
+        tau_total = np.zeros(nv)
+
+        if int(t * 1000) % 20 == 0:
+            self._traj_log.append({
+                "t": t, "obj_x": object_xy_true[0], "obj_y": object_xy_true[1],
+                "obj_x_perc": object_xy[0], "obj_y_perc": object_xy[1],
+                "sph_x": p_sph[0], "sph_y": p_sph[1], "state": self._ctrl_state,
+            })
+
+        # Updated on EVERY tick, regardless of state — otherwise a run
+        # stuck in REPOSITION (never back in PUSH before the sim ends)
+        # would report the distance from its last PUSH tick, not its
+        # actual final position (bug found empirically: a run stuck in
+        # REPOSITION at ~122mm was reporting ~40mm, the stale value from
+        # its last time in PUSH).
+        self._last_dist = float(np.linalg.norm(object_xy_true - self.object_target))
+
+        def send(tau_xyz):
+            tau = tau_xyz - g_arm
+            if DEBUG_VERBOSE and int(t * 1000) % 200 == 0:
+                sat = np.abs(tau) > JOINT_TORQUE_LIMITS
+                if sat.any():
+                    print(f"    [sat t={t:.2f}s][{self._ctrl_state}] saturated joints: {np.where(sat)[0]}  "
+                          f"tau_demanded={np.round(tau[sat],1)} vs limit={JOINT_TORQUE_LIMITS[sat]}")
+            tau = np.clip(tau, -JOINT_TORQUE_LIMITS, JOINT_TORQUE_LIMITS)   # Objective 2
+            tau_total[self._arm_vel_idx] = tau
+            discrete_state.get_mutable_vector().SetFromVector(tau_total)
+
+        # ── DONE: active retract then damping ─────────────────────────────
+        if self._ctrl_state == STATE_DONE:
+            if self._done_time is None:
+                self._done_time = t
+            if t - self._done_time < DONE_RETRACT_TIME:
+                # Retreat direction recomputed EVERY tick from the sphere's
+                # position relative to the object's CURRENT position — NOT
+                # self._face_normal, which is frozen at whatever it was
+                # when DONE triggered and never updated during DONE (no
+                # contact check either — _measure_force() isn't called in
+                # this branch at all). If the geometry has shifted since
+                # then (very possible right after a stall near the target,
+                # where the preceding few ticks are exactly the "flick"-
+                # adjacent zone this whole controller works hard to damp),
+                # a frozen direction has no guarantee of still pointing
+                # away from the object — it can sweep back into it with
+                # zero awareness (observed empirically: object re-shoved
+                # partway through what should have been a clean retreat).
+                # Always retreating away from the object's actual current
+                # position rules this out structurally.
+                retreat_dir = p_sph[:2] - object_xy_true
+                retreat_dir /= np.linalg.norm(retreat_dir) + 1e-9
+                v_retreat = DONE_RETRACT_SPEED * retreat_dir
+                vz = np.clip(0.3 * (Z_PUSH - p_sph[2]) - 0.04 * v_sph[2], -0.01, 0.01)
+                F_trans = Kv * (np.array([v_retreat[0], v_retreat[1], vz]) - v_sph)
+                send(Jv.T @ F_trans)
+            else:
+                send(Jv.T @ (-Kd_pos * v_sph))
+            return
+
+        # ── APPROACH / REPOSITION ──────────────────────────────────────────
+        if self._ctrl_state in (STATE_APPROACH, STATE_REPOSITION):
+            if self._wp_state_time is None:
+                self._wp_state_time = t
+            wp = self._waypoints[self._wp_idx].copy()
+            wp[2] = max(wp[2], Z_FLOOR)
+            reached = np.linalg.norm(p_sph - wp) < WAYPOINT_THRESHOLD
+            timed_out = (t - self._wp_state_time) > WAYPOINT_TIMEOUT
+            if reached or timed_out:
+                if timed_out:
+                    print(f"[t={t:.2f}s][{self._ctrl_state}] ⚠ WP{self._wp_idx} timeout")
+                self._wp_state_time = t
+                if self._wp_idx < len(self._waypoints) - 1:
+                    self._wp_idx += 1
+                    print(f"[t={t:.2f}s][{self._ctrl_state}] → WP{self._wp_idx} "
+                          f"{np.round(self._waypoints[self._wp_idx], 3)}")
+                else:
+                    self._ctrl_state = STATE_PUSH
+                    self._reset_push_state()
+                    self._push_start_sph_xy = p_sph[:2].copy()
+                    print(f"[t={t:.2f}s] ══ PUSH ══")
+            F_pos = Kp_pos * (wp - p_sph) - Kd_pos * v_sph + F_floor
+            send(Jv.T @ F_pos)
+            return
+
+        # ── PUSH ───────────────────────────────────────────────────────────
+        dist = np.linalg.norm(object_xy - self.object_target)             # perceived — drives the controller
+        dist_true = np.linalg.norm(object_xy_true - self.object_target)   # real — for metrics
+        self._last_dist = dist_true
+
+        if dist < DONE_THRESHOLD:
+            self._ctrl_state = STATE_DONE
+            self._done_time = None
+            self._done_sim_time = t
+            print(f"[t={t:.1f}s] ✓ DONE dist={dist_true * 1000:.1f}mm shape={self.shape_type}")
+            send(Jv.T @ (-Kd_pos * v_sph))
+            return
+        sphere_progress = float(np.dot(p_sph[:2] - self._push_start_sph_xy, self._push_plan_dir))
+        if sphere_progress >= self._push_plan_dist:
+            self._ctrl_state = STATE_DONE
+            self._done_time = None  
+            self._done_sim_time = t
+            print(f"[t={t:.1f}s] ✓ DONE (dead-reckoning) dist_true={dist_true*1000:.1f}mm "
+                f"sphere_progress={sphere_progress*1000:.1f}mm")
+            send(Jv.T @ (-Kd_pos * v_sph))
+            return
+        # Object's own velocity — correct dt here (1 ms, _update's real
+        # cadence; do NOT compute this in _log(), which runs at 1 Hz).
+        if self._prev_object_xy is not None:
+            v_obj_raw = (object_xy - self._prev_object_xy) / 0.001
+            self._v_obj_filt = 0.2 * v_obj_raw + 0.8 * self._v_obj_filt
+        self._prev_object_xy = object_xy.copy()
+
+        # 1) Desired direction — recomputed fresh every tick, BUT low-pass
+        #    filtered (D_HAT_BETA) before use. Without this, d_hat can
+        #    reverse by more than 140° in ~1s if the object slightly
+        #    overshoots the target (observed empirically: direct cause of
+        #    the "flick" — sudden jump + force pinned at the fallback
+        #    ceiling). The filter damps THIS rotation, not K_LAT itself
+        #    (which stays at full strength on the filtered direction,
+        #    unchanged steady-state accuracy).
+        d_hat_raw = self.object_target - object_xy
+        d_hat_raw /= np.linalg.norm(d_hat_raw) + 1e-9
+        if self._d_hat_filt is None:
+            self._d_hat_filt = d_hat_raw.copy()
+        else:
+            self._d_hat_filt = D_HAT_BETA * d_hat_raw + (1 - D_HAT_BETA) * self._d_hat_filt
+            self._d_hat_filt /= np.linalg.norm(self._d_hat_filt) + 1e-9
+        d_hat = self._d_hat_filt
+        theta_d = np.arctan2(d_hat[1], d_hat[0])
+        n_d = np.array([-d_hat[1], d_hat[0]])
+
+        # Geometric normal of the active face.
+        #   cylinder: continuous radial direction, derived from d_hat —
+        #             already filtered above (D_HAT_BETA), so no more risk
+        #             of a brutal flip here even near the target.
+        #   cube:     must NOT be recomputed from d_hat — even filtered, a
+        #             cube face must stay a discrete, stable choice, not
+        #             follow a continuous direction (bug found
+        #             empirically: re-choosing from d_hat every tick
+        #             precipitated instability near the target). Only the
+        #             object's own rotation (theta_o) since planning time
+        #             is applied to the axis frozen at that time — but
+        #             theta_o itself is low-pass filtered first
+        #             (THETA_O_BETA), unit-vector form to avoid angle
+        #             wraparound. Without this, a fast real spin (more
+        #             likely for smaller/lighter objects — see
+        #             THETA_O_BETA's comment on rotational inertia) swings
+        #             face_normal every tick, contaminating eps_lat and the
+        #             geometric force fallback — a slower, multi-second
+        #             sibling of the cylinder's instantaneous flick.
+        if self.shape_type == "cylinder":
+            self._face_normal = get_approach_direction(d_hat, self.shape_type, theta_o)
+        else:
+            theta_o_vec_raw = np.array([np.cos(theta_o), np.sin(theta_o)])
+            if self._theta_o_filt_vec is None:
+                self._theta_o_filt_vec = theta_o_vec_raw.copy()
+            else:
+                self._theta_o_filt_vec = (THETA_O_BETA * theta_o_vec_raw
+                                           + (1 - THETA_O_BETA) * self._theta_o_filt_vec)
+                self._theta_o_filt_vec /= np.linalg.norm(self._theta_o_filt_vec) + 1e-9
+            theta_o_filt = np.arctan2(self._theta_o_filt_vec[1], self._theta_o_filt_vec[0])
+
+            dtheta = theta_o_filt - self._cube_theta_o_ref
+            c, s = np.cos(dtheta), np.sin(dtheta)
+            R = np.array([[c, -s], [s, c]])
+            self._face_normal = R @ self._cube_face_base
+
+        # 2) Contact proximity check — computed BEFORE the force
+        # measurement now, so it can gate the geometric fallback (see
+        # _measure_force's near_object parameter and its comment).
+        # (based on the real position, not the perceived one)
+        if self.shape_type == "cylinder":
+            in_contact_geom = np.linalg.norm(p_sph[:2] - object_xy_true) < (
+                self.half_extent + SPHERE_RADIUS + CONTACT_DIST_MARGIN)
+        else:
+            offset = self._current_face_offset()
+            face_center = object_xy_true + offset * self._face_normal
+            in_contact_geom = float((p_sph[:2] - face_center) @ self._face_normal) < (
+                SPHERE_RADIUS + CONTACT_DIST_MARGIN)
+
+        # 3) Force measurement — raw vector, no decomposition (Objective 3)
+        # NB: object_xy_true, not object_xy — physical channel independent
+        # of vision (a force sensor is not a camera).
+        f_xy, drake_ok = self._measure_force(context, p_sph[:2], object_xy_true, in_contact_geom)
+        self._fk_filt = BETA * f_xy + (1 - BETA) * self._fk_filt
+        f_mag = float(np.linalg.norm(self._fk_filt))
+
+        if int(t * 1000) % 10 == 0:
+            self._force_log.append({"t": t, "f_mag": f_mag, "drake_ok": drake_ok})
+
+        self._contact = drake_ok or in_contact_geom or (f_mag >= F_MIN)
+
+        # 4) Heins' law — the "finger" (end-effector) adapts its direction
+        #    to stay engaged (Objective 1 + 3, thesis eq. 4.25)
+        if self._contact and f_mag >= F_MIN:
+            theta_f = np.arctan2(self._fk_filt[1], self._fk_filt[0])
+            delta_f = np.arctan2(np.sin(theta_f - theta_d), np.cos(theta_f - theta_d))
+            delta_c = float(n_d @ (p_sph[:2] - object_xy))
+            theta_p = theta_d + (K_F + 1.0) * delta_f + K_C * delta_c
+        else:
+            theta_p = theta_d
+        push_dir_corrected = np.array([np.cos(theta_p), np.sin(theta_p)])
+
+        if DEBUG_VERBOSE and int(t * 1000) % 200 == 0:
+            print(f"    δf = {np.degrees(delta_f if self._contact and f_mag >= F_MIN else 0.0):+.1f}°")
+
+        # ── prolonged loss of contact → repositioning (or DONE if close enough) ──
+        if not self._contact:
+            self._no_contact_t += 0.001
+            if self._no_contact_t > NO_CONTACT_TIMEOUT:
+                if dist < DONE_THRESHOLD * DONE_TOLERANCE_RATIO:
+                    self._ctrl_state = STATE_DONE
+                    self._done_time = None
+                    self._done_sim_time = t
+                    print(f"[t={t:.1f}s] ✓ DONE (close, contact lost) dist={dist_true*1000:.1f}mm")
+                    send(Jv.T @ (-Kd_pos * v_sph))
+                    return
+                print(f"[t={t:.2f}s] ⚠ contact lost — repositioning dist={dist * 1000:.1f}mm")
+                self._plan_reposition(object_xy, p_sph, theta_o)
+                wp = self._waypoints[0].copy(); wp[2] = max(wp[2], Z_FLOOR)
+                send(Jv.T @ (Kp_pos * (wp - p_sph) - Kd_pos * v_sph + F_floor))
+                return
+        else:
+            self._no_contact_t = 0.0
+
+        # 5) Commanded velocity — braking profile + decoupled lateral
+        #    centering (Objective 2 + 3). v_profile decelerates on final
+        #    approach; K_LAT stays at full strength at all times (lateral
+        #    accuracy must never degrade near the target).
+        span = max(BRAKE_RADIUS - DONE_THRESHOLD, 1e-6)
+        frac = float(np.clip((dist - DONE_THRESHOLD) / span, 0.0, 1.0))
+        v_profile = max(V_PUSH * np.sqrt(frac), V_MIN_CREEP)
+
+        eps_lat = float(n_d @ (object_xy - p_sph[:2]))
+        v_xy = v_profile * push_dir_corrected + K_LAT * eps_lat * n_d
+
+        # Damps ONLY the object's excess velocity relative to the allowed
+        # profile — never its legitimate velocity.
+        v_obj_along = float(np.dot(self._v_obj_filt, push_dir_corrected))
+        excess = v_obj_along - v_profile
+        if excess > 0:
+            v_xy = v_xy - V_OBJ_DAMPING * excess * push_dir_corrected
+
+        if f_mag > F_MAX:
+            v_xy *= F_MAX / f_mag   # admittance saturation
+
+        # Generic safety cap, independent of the measured force
+        speed = np.linalg.norm(v_xy)
+        if speed > V_XY_HARD_CAP:
+            v_xy *= V_XY_HARD_CAP / speed
+
+        if DEBUG_VERBOSE and int(t * 1000) % 50 == 0:
+            print(f"    [diag] t={t:.2f} f_mag={f_mag:.2f} drake_ok={drake_ok} "
+                  f"v_xy_norm={np.linalg.norm(v_xy):.4f} v_profile={v_profile:.4f}")
+
+        vz = np.clip(0.3 * (Z_PUSH - p_sph[2]) - 0.04 * v_sph[2], -0.01, 0.01)
+        v_cmd = np.array([v_xy[0], v_xy[1], vz])
+        F_trans = Kv * (v_cmd - v_sph) + F_floor
+        send(Jv.T @ F_trans)
+
+    # ── logging / diagnostics ────────────────────────────────────────────
+
+    def _log(self, context, mode=None):
+        x = self._state_port.Eval(context)
+        t = context.get_time()
+        CalcRobotDynamics(self.plant, q=x[:self._nq], v=x[self._nq:])
+        object_xy = self._get_object_xy(x[:self._nq])
+        theta_o = self._get_object_yaw(x[:self._nq])
+        dist = np.linalg.norm(object_xy - self.object_target)
+        f_mag = float(np.linalg.norm(self._fk_filt))
+        print(f"[t={t:.1f}s][{self._ctrl_state}][{self.shape_type}] "
+              f"obj=({object_xy[0]:.3f},{object_xy[1]:.3f}) yaw={np.degrees(theta_o):+.1f}° "
+              f"dist={dist * 1000:.1f}mm "
+              f"|f|={f_mag:.2f}N "
+              f"{'CONTACT✓' if self._contact else 'no-contact'}")
+
+    def get_metrics(self):
+        lat_mean, lat_max = self._lateral_deviation_stats()
+        perc_mean, perc_max = self._perception_error_stats()
+        return {
+            "shape": self.shape_type,
+            "half_extent": self.half_extent,
+            "half_extent_y": self.half_extent_y,
+            "success": self._ctrl_state == STATE_DONE,
+            "final_dist_mm": float(self._last_dist * 1000) if self._last_dist is not None else float("nan"),
+            "completion_time_s": self._done_sim_time,
+            "drake_contact_pct": (100.0 * np.mean([e["drake_ok"] for e in self._force_log])
+                                   if self._force_log else 0.0),
+            "lateral_dev_mean_mm": lat_mean,
+            "lateral_dev_max_mm": lat_max,
+            "perception_error_mean_mm": perc_mean,
+            "perception_error_max_mm": perc_max,
+        }
+
+    def _lateral_deviation_stats(self):
+        """Lateral deviation [mm] between the actual trajectory (ground
+        truth) and the theoretical straight line start→target."""
+        if not self._traj_log:
+            return float("nan"), float("nan")
+        d = self.object_target - self._obj_start_xy
+        d_hat = d / (np.linalg.norm(d) + 1e-9)
+        n_hat = np.array([-d_hat[1], d_hat[0]])
+        devs = [abs(np.dot(np.array([e["obj_x"], e["obj_y"]]) - self._obj_start_xy, n_hat))
+                for e in self._traj_log]
+        devs = np.array(devs) * 1000.0
+        return float(np.mean(devs)), float(np.max(devs))
+
+    def _perception_error_stats(self):
+        """Error [mm] between perceived and real position — nan if
+        camera_model is None (absolute position, historical behavior)."""
+        if not self._traj_log or self._camera_model is None:
+            return float("nan"), float("nan")
+        errs = [np.hypot(e["obj_x_perc"] - e["obj_x"], e["obj_y_perc"] - e["obj_y"])
+                for e in self._traj_log]
+        errs = np.array(errs) * 1000.0
+        return float(np.mean(errs)), float(np.max(errs))
+
+    def save_force_plot(self):
+        if not self._force_log:
+            return
+        t_arr = np.array([e["t"] for e in self._force_log])
+        f_arr = np.array([e["f_mag"] for e in self._force_log])
+        mask = np.array([e["drake_ok"] for e in self._force_log])
+        plt.figure(figsize=(9, 4))
+        plt.plot(t_arr[mask], f_arr[mask], ".", ms=2, color="steelblue", label="Drake")
+        plt.plot(t_arr[~mask], f_arr[~mask], ".", ms=2, color="tomato", label="geometric fallback")
+        plt.axhline(F_MAX, color="green", ls=":", label=f"F_max={F_MAX}N")
+        plt.xlabel("time [s]"); plt.ylabel("|f| [N]")
+        plt.title(f"Contact force — {self.shape_type}  "
+                  f"(Drake {100 * mask.mean():.1f}% of the time)")
+        plt.legend(); plt.grid(True); plt.tight_layout()
+        os.makedirs("figures", exist_ok=True)
+        suffix = f"_{self._run_tag}" if self._run_tag else ""
+        fname = f"figures/force_{self.shape_type}{suffix}.png"
+        plt.savefig(fname, dpi=150); plt.close()
+        print(f"[Plot] → {fname}")
+
+    def save_trajectory_plot(self):
+        if not self._traj_log:
+            return
+        obj_x = np.array([e["obj_x"] for e in self._traj_log])
+        obj_y = np.array([e["obj_y"] for e in self._traj_log])
+        sph_x = np.array([e["sph_x"] for e in self._traj_log])
+        sph_y = np.array([e["sph_y"] for e in self._traj_log])
+
+        plt.figure(figsize=(7, 6))
+        plt.plot([self._obj_start_xy[0], self.object_target[0]],
+                  [self._obj_start_xy[1], self.object_target[1]],
+                  "--", color="gray", lw=1.5, label="Theoretical trajectory (straight line)")
+        plt.plot(obj_x, obj_y, "-", color="steelblue", lw=2, label="Object trajectory (actual)")
+        if self._camera_model is not None:
+            perc_x = np.array([e["obj_x_perc"] for e in self._traj_log])
+            perc_y = np.array([e["obj_y_perc"] for e in self._traj_log])
+            plt.plot(perc_x, perc_y, ".", color="purple", ms=2, alpha=0.5,
+                      label="Perceived position (camera)")
+        plt.plot(sph_x, sph_y, ":", color="tomato", lw=1, alpha=0.6, label="Pusher trajectory")
+        plt.plot(*self._obj_start_xy, "o", color="black", ms=8, label="Start")
+        plt.plot(*self.object_target, "*", color="green", ms=14, label="Target")
+        plt.plot(obj_x[-1], obj_y[-1], "x", color="red", ms=10, mew=2, label="Final position")
+        plt.gca().set_aspect("equal", adjustable="box")
+        plt.xlabel("x [m]"); plt.ylabel("y [m]")
+        plt.title(f"Trajectory — {self.shape_type}")
+        plt.legend(loc="best", fontsize=8)
+        plt.grid(True, alpha=0.3); plt.tight_layout()
+        os.makedirs("figures", exist_ok=True)
+        suffix = f"_{self._run_tag}" if self._run_tag else ""
+        fname = f"figures/traj_{self.shape_type}{suffix}.png"
+        plt.savefig(fname, dpi=150); plt.close()
+        print(f"[Plot] → {fname}")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  DIAGNOSTIC — a body's collision geometries (optional, not called
+#  automatically)
+# ═══════════════════════════════════════════════════════════════════════════
+
+def list_body_collision_geometries(plant, scene_graph, body_name):
+    """
+    Lists a body's collision geometries (name, type, local pose) to
+    precisely identify an off-center geometry (e.g. panda_link8's sphere)
+    without having to reread the URDF. Call after plant.Finalize(). The
+    exact API (GetPoseInFrame / X_FG depending on Drake version) may vary
+    slightly — adapt if needed.
+    Usage: list_body_collision_geometries(plant, sg, "panda_link8")
+    """
+    body = plant.GetBodyByName(body_name)
+    geoms = plant.GetCollisionGeometriesForBody(body)
+    inspector = scene_graph.model_inspector()
+    print(f"\n[Diag] Collision geometries of {body_name} ({len(geoms)}):")
+    for gid in geoms:
+        shape = inspector.GetShape(gid)
+        name = inspector.GetName(gid)
+        try:
+            X_BG = inspector.GetPoseInFrame(gid)
+            pose_str = np.round(X_BG.translation(), 4)
+        except Exception:
+            pose_str = "?"
+        print(f"  - {name}: {type(shape).__name__}  local_pose={pose_str}")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  SCENE AND SIMULATION
+# ═══════════════════════════════════════════════════════════════════════════
+
+def create_sim_scene(sdf_path, shape_type, half_extent, half_extent_y=None,
+                      object_model_name="object", object_pos=None, object_target=None,
+                      sim_time_step=0.0001, render=False, meshcat=None, run_tag=None,
+                      camera_model=None):
+    builder = DiagramBuilder()
+    plant, sg = AddMultibodyPlantSceneGraph(builder, time_step=sim_time_step)
+    parser = Parser(plant)
+    parser.AddModelsFromUrl("file://" + os.path.abspath(ROBOT_URDF_PATH))
+    parser.AddModelsFromUrl("file://" + os.path.abspath(sdf_path))
+    plant.WeldFrames(
+        plant.world_frame(),
+        plant.GetFrameByName("panda_link0", plant.GetModelInstanceByName("panda")),
+        ROBOT_BASE_OFFSET)
+    plant.Finalize()
+
+    # [Optional diagnostic — uncomment to identify a precise geometry on a
+    #  wrist link, see list_body_collision_geometries]:
+    # list_body_collision_geometries(plant, sg, "panda_link8")
+
+    # ── Excludes the links listed in WRIST_LINKS_NO_OBJECT_COLLISION from
+    # any collision with the object — see that constant's comment at the
+    # top of the file (default: all 4 wrist links).
+    try:
+        obj_model = plant.GetModelInstanceByName(object_model_name)
+        obj_body = None
+        for bi in plant.GetBodyIndices(obj_model):
+            b = plant.get_body(bi)
+            if b.name() != "world":
+                obj_body = b
+                break
+        if obj_body is not None:
+            obj_geoms = plant.GetCollisionGeometriesForBody(obj_body)
+            for link_name in WRIST_LINKS_NO_OBJECT_COLLISION:
+                try:
+                    link_body = plant.GetBodyByName(link_name)
+                    link_geoms = plant.GetCollisionGeometriesForBody(link_body)
+                    if link_geoms and obj_geoms:
+                        sg.collision_filter_manager().Apply(
+                            CollisionFilterDeclaration().ExcludeBetween(
+                                GeometrySet(link_geoms), GeometrySet(obj_geoms)))
+                except RuntimeError:
+                    pass
+            print(f"[Scene] Wrist collisions ↔ {object_model_name} excluded "
+                  f"({', '.join(WRIST_LINKS_NO_OBJECT_COLLISION)})")
+    except Exception as e:
+        print(f"[Scene] ⚠ collision exclusion not applied ({e}) — "
+              f"check your Drake version if contact looks incorrect.")
+
+    print("Positions:", plant.num_positions(), " Velocities:", plant.num_velocities())
+
+    best_q7 = [0.0, -0.3, 0.0, -2.2, 0.0, 2.0, 0.0]
+    for name, val in zip(
+            ["panda_joint1", "panda_joint2", "panda_joint3", "panda_joint4",
+             "panda_joint5", "panda_joint6", "panda_joint7"], best_q7):
+        plant.GetJointByName(name).set_default_angle(val)
+
+    if render and meshcat is not None:
+        AddDefaultVisualization(builder=builder, meshcat=meshcat)
+
+    ctrl = builder.AddNamedSystem("PushController", PushController(
+        plant, best_q7, shape_type=shape_type, half_extent=half_extent,
+        half_extent_y=half_extent_y, object_model_name=object_model_name,
+        object_pos=object_pos, object_target=object_target, run_tag=run_tag,
+        camera_model=camera_model))
+    des = builder.AddNamedSystem("DesiredPos", ConstantVectorSource(best_q7))
+
+    builder.Connect(plant.get_state_output_port(), ctrl.GetInputPort("Current_state"))
+    builder.Connect(ctrl.GetOutputPort("tau_u"), plant.GetInputPort("applied_generalized_force"))
+    builder.Connect(des.get_output_port(), ctrl.GetInputPort("Desired_state"))
+    builder.Connect(plant.get_contact_results_output_port(), ctrl.GetInputPort("contact_results"))
+
+    logger = LogVectorOutput(plant.get_state_output_port(), builder)
+    logger.set_name("State logger")
+    return builder.Build(), logger, best_q7, ctrl
+
+
+def run_trial(sdf_path, shape_type, half_extent, half_extent_y=None,
+              object_model_name="object", object_pos=None, object_target=None,
+              sim_time=25.0, render=False, sim_time_step=0.0001, run_tag=None,
+              camera_model=CameraModel(freeze_after_first_capture=True, noise_std_m=0.003)):
+    meshcat = None
+    if render:
+        meshcat = StartMeshcat()
+        meshcat.Delete()
+        meshcat.DeleteAddedControls()
+
+    diagram, logger, best_q7, ctrl = create_sim_scene(
+        sdf_path, shape_type, half_extent, half_extent_y=half_extent_y,
+        object_model_name=object_model_name, object_pos=object_pos,
+        object_target=object_target, sim_time_step=sim_time_step,
+        render=render, meshcat=meshcat, run_tag=run_tag, camera_model=camera_model)
+
+    sim = Simulator(diagram)
+    sim.Initialize()
+    if render:
+        sim.set_target_realtime_rate(1.0)
+
+    try:
+        if render:
+            meshcat.StartRecording()
+        sim.AdvanceTo(sim_time)
+        if render:
+            meshcat.PublishRecording()
+    except Exception as e:
+        print(f"[run_trial] failed: {e}")
+        return {"shape": shape_type, "success": False, "error": str(e),
+                "final_dist_mm": float("nan"), "completion_time_s": None,
+                "drake_contact_pct": 0.0}
+
+    ctrl.save_force_plot()
+    ctrl.save_trajectory_plot()
+
+    # Recompute final_dist_mm from the REAL final simulation state —
+    # ctrl._last_dist is refreshed on every _update() tick regardless of
+    # state (see the comment in _update), but recomputing it directly from
+    # the diagram's final context here is the most robust source of
+    # truth: it doesn't depend on any controller-internal bookkeeping at
+    # all, just the actual final object pose.
+    final_ctx = ctrl.plant.GetMyContextFromRoot(sim.get_context())
+    final_q = ctrl.plant.GetPositions(final_ctx)
+    final_obj_xy = ctrl._get_object_xy(final_q)
+    true_final_dist_mm = float(np.linalg.norm(final_obj_xy - ctrl.object_target) * 1000)
+
+    metrics = ctrl.get_metrics()
+    metrics["final_dist_mm"] = true_final_dist_mm
+    return metrics
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  DIRECT EXECUTION
+# ═══════════════════════════════════════════════════════════════════════════
+if __name__ == "__main__":
+    SHAPE = "cube"
+    SDF_PATH = "models_generated/bench_cube_m0.5_mu0.5.sdf"
+    HALF_EXT_X = 0.05   # half-side x → total width 0.20m
+    HALF_EXT_Y = 0.05  # half-side y → total depth 0.12m
+
+    metrics = run_trial(
+        sdf_path=SDF_PATH, shape_type=SHAPE, half_extent=HALF_EXT_X,
+        half_extent_y=HALF_EXT_Y, object_model_name="object",
+        sim_time=25.0, render=True,
+    )
+    print("\n=== Result ===")
+    for k, v in metrics.items():
+        print(f"  {k}: {v}")
