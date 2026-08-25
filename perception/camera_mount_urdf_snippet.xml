@@ -1,0 +1,109 @@
+<!-- ═══════════════════════════════════════════════════════════════════════
+     CAMÉRA EYE-IN-HAND — bloc à coller dans panda_arm_hand_sphere.urdf
+
+     OÙ : juste AVANT la balise fermante </robot>, après les deux blocs
+          <drake:collision_filter_group>.
+
+     Je ne te renvoie pas le fichier complet volontairement : recopier 600
+     lignes que je ne peux pas tester t'expose à une coquille silencieuse.
+     Ce bloc se colle en cinq secondes et ne touche à rien d'existant.
+     ═══════════════════════════════════════════════════════════════════════
+
+     GÉOMÉTRIE VÉRIFIÉE PAR CINÉMATIQUE DIRECTE (q7 = [0,-0.3,0,-2.2,0,2.0,0])
+
+       panda_hand est à [0.474, 0, 0.516] dans le repère base, et :
+         +x_hand  ->  monde [ 0.995,  0,  0.100]   avant, quasi horizontal
+         +y_hand  ->  monde [ 0,     -1,  0    ]
+         +z_hand  ->  monde [ 0.100,  0, -0.995]   VERS LE BAS
+
+       Donc : "avancer" = +x_hand, "monter" = -z_hand.
+
+     CONTRAINTE DE PLACEMENT
+
+       Dans ton URDF, panda_hand N'EST PAS une main : c'est directement la
+       sphère pousseuse, rayon 0.05, centrée sur l'origine du repère.
+       Toute position de montage doit donc vérifier |xyz| > 0.05, sinon la
+       caméra est physiquement À L'INTÉRIEUR du pousseur. Les trois
+       montages ci-dessous respectent cette contrainte avec marge.
+
+     CONVENTION DE REPÈRES
+
+       camera_body    : convention ROS  -> +x avant, +y gauche, +z haut
+       camera_optical : convention optique (celle de Drake RgbdSensor)
+                        -> +z axe de visée, +x droite image, +y bas image
+       La rotation entre les deux est la rotation ROS standard
+       rpy = (-pi/2, 0, -pi/2). Ne la modifie pas.
+       Pour changer l'orientation de visée, modifie UNIQUEMENT le rpy de
+       camera_mount_joint.
+     ═══════════════════════════════════════════════════════════════════════ -->
+
+<!-- Corps physique de la caméra. Modelé sur une Intel RealSense D455 :
+     124 x 26 x 29 mm, 72 g. Le pavé visuel est décalé de -13 mm sur +x
+     pour que sa FACE AVANT coïncide avec le centre optique — sinon le
+     boîtier apparaît dans sa propre image.
+     PAS de <collision> : la caméra ne doit jamais générer de contact,
+     sans quoi elle polluerait tes ContactResults. -->
+<link name="camera_body">
+  <inertial>
+    <mass value="0.072"/>
+    <origin xyz="-0.013 0 0" rpy="0 0 0"/>
+    <inertia ixx="9.73e-05" ixy="0.0" ixz="0.0"
+             iyy="9.10e-06" iyz="0.0" izz="9.63e-05"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.013 0 0" rpy="0 0 0"/>
+    <geometry>
+      <box size="0.026 0.124 0.029"/>
+    </geometry>
+    <material name="realsense_dark">
+      <color rgba="0.13 0.13 0.15 1.0"/>
+    </material>
+  </visual>
+</link>
+
+<!-- ── MONTAGE ACTIF : "over" ──────────────────────────────────────────
+     10 cm au-dessus du centre de la sphère, 2 cm en avant, axe optique
+     incliné de 43.6 deg vers le bas. Vise un point à 0.125 m devant le
+     centre de la sphère, à la même hauteur — c'est-à-dire le centre de
+     l'objet pendant le contact (0.10 m pour le cube, 0.15 m pour le
+     cylindre ; 0.125 est le compromis).
+
+     La ligne de visée passe à 8.6 cm de l'axe de la sphère, donc au-delà
+     de son rayon de 5 cm : l'objet n'est pas masqué par le pousseur.     -->
+<joint name="camera_mount_joint" type="fixed">
+  <parent link="panda_hand"/>
+  <child link="camera_body"/>
+  <origin xyz="0.0200 0.0000 -0.1000" rpy="3.141593 -0.761013 0.000000"/>
+</joint>
+
+<!-- ── MONTAGES ALTERNATIFS — décommente-en un et commente celui du haut.
+        C'est exactement ce que camera_probe.py compare.
+
+     "over_back" : plus en retrait (13 cm au-dessus, 2 cm en arrière).
+        Objet à 0.195 m au lieu de 0.145 m — le cylindre tient presque
+        dans le champ, alors qu'il déborde avec "over".
+  <joint name="camera_mount_joint" type="fixed">
+    <parent link="panda_hand"/>
+    <child link="camera_body"/>
+    <origin xyz="-0.0200 0.0000 -0.1300" rpy="3.141593 -0.730907 0.000000"/>
+  </joint>
+
+     "side" : décalée de 8.5 cm latéralement, regarde l'objet en biais
+        à côté de la sphère. Dépression plus faible (22.8 deg), vue plus
+        rasante sur l'objet — donc biais de centroïde plus marqué.
+  <joint name="camera_mount_joint" type="fixed">
+    <parent link="panda_hand"/>
+    <child link="camera_body"/>
+    <origin xyz="0.0100 0.0850 -0.0600" rpy="-3.141593 -0.397263 -0.636508"/>
+  </joint>
+                                                                        -->
+
+<!-- Repère optique. Corps sans masse, soudé : Drake le fusionne avec son
+     parent, aucune dynamique ajoutée. C'est ce repère que RgbdSensor
+     utilisera. -->
+<link name="camera_optical"/>
+<joint name="camera_optical_joint" type="fixed">
+  <parent link="camera_body"/>
+  <child link="camera_optical"/>
+  <origin xyz="0 0 0" rpy="-1.570796 0 -1.570796"/>
+</joint>

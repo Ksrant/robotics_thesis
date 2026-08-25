@@ -1,0 +1,5447 @@
+[
+{
+"pg": 1,
+"type": "Highlight",
+"txt": "The term \u201cPerception\u201d in the title is currently not justified by the methodology. A simulated noisy object-position measurement is not by itself a perception contribution. Either an actual perception pipeline must be implemented/evaluated or the scope/title needs to represent the actual work more accurately.",
+"rect": [
+118,
+540,
+478,
+591
+]
+},
+{
+"pg": 2,
+"type": "Highlight",
+"txt": "you are dealing with contact so if you only validated in simulation then i expect the solver to be a high fidelity one.. spend extra effort in describing the solver you used and also how the simulation of the contact there is sufficent for validation..",
+"rect": [
+56,
+418,
+231,
+430
+]
+},
+{
+"pg": 2,
+"type": "Highlight",
+"txt": "I see..so you assume that you have a f/t sensor that is accurate enough to infer the direction of the contact... maybe review the exisiting sensors that can be used for such a case as a preparation for your presentation.",
+"rect": [
+56,
+439,
+429,
+451
+]
+},
+{
+"pg": 2,
+"type": "Highlight",
+"txt": "I would not call this a camera-based perception model. Later you use the ground-truth simulated object position and artificially add noise, latency and frame loss. No image/camera processing or object-localisation method is implemented.",
+"rect": [
+56,
+317,
+539,
+369
+]
+},
+{
+"pg": 2,
+"type": "Highlight",
+"txt": "The abstract substantially overclaims the achieved contribution and results. Clearly distinguish the existing Force Push method from your additions. Do not describe synthetic ground-truth measurements with added noise/dropout as a perception contribution. The statement about robustness to 90% observation loss is not supported by your own results and must be corrected.",
+"rect": [
+470,
+658,
+529,
+677
+]
+},
+{
+"pg": 2,
+"type": "Highlight",
+"txt": "Be careful with \u201cproposes\u201d. The central reactive force-feedback pushing law is based on existing work [19]. The abstract should clearly distinguish what is taken from [19] and what was actually developed in this thesis.",
+"rect": [
+73,
+459,
+360,
+471
+]
+},
+{
+"pg": 2,
+"type": "Highlight",
+"txt": "Which of these terms are your actual contribution? Please state this explicitly. At the moment the abstract combines the existing controller and your modifications in a way that makes it difficult to identify what is new.",
+"rect": [
+56,
+357,
+539,
+390
+]
+},
+{
+"pg": 2,
+"type": "Highlight",
+"txt": "This claim is too strong and is not supported by your own results. At 90% frame loss the mean lateral deviation increases and some runs fail severely (including the cube case with ~248 mm final error). Please revise the claim based on the actual results.",
+"rect": [
+56,
+215,
+539,
+248
+]
+},
+{
+"pg": 3,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+553,
+97,
+563
+]
+},
+{
+"pg": 3,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+523,
+153,
+533
+]
+},
+{
+"pg": 3,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+493,
+133,
+503
+]
+},
+{
+"pg": 3,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+473,
+144,
+482
+]
+},
+{
+"pg": 3,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+453,
+158,
+462
+]
+},
+{
+"pg": 3,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+420,
+121,
+432
+]
+},
+{
+"pg": 3,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+393,
+140,
+402
+]
+},
+{
+"pg": 3,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+370,
+230,
+382
+]
+},
+{
+"pg": 3,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+350,
+226,
+362
+]
+},
+{
+"pg": 3,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+329,
+244,
+341
+]
+},
+{
+"pg": 3,
+"type": "Link",
+"txt": "",
+"rect": [
+92,
+309,
+308,
+321
+]
+},
+{
+"pg": 3,
+"type": "Link",
+"txt": "",
+"rect": [
+92,
+289,
+242,
+301
+]
+},
+{
+"pg": 3,
+"type": "Link",
+"txt": "",
+"rect": [
+92,
+271,
+205,
+280
+]
+},
+{
+"pg": 3,
+"type": "Link",
+"txt": "",
+"rect": [
+92,
+250,
+261,
+260
+]
+},
+{
+"pg": 3,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+228,
+307,
+240
+]
+},
+{
+"pg": 3,
+"type": "Link",
+"txt": "",
+"rect": [
+92,
+208,
+285,
+219
+]
+},
+{
+"pg": 3,
+"type": "Link",
+"txt": "",
+"rect": [
+92,
+187,
+272,
+199
+]
+},
+{
+"pg": 3,
+"type": "Link",
+"txt": "",
+"rect": [
+92,
+169,
+300,
+179
+]
+},
+{
+"pg": 3,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+147,
+223,
+158
+]
+},
+{
+"pg": 3,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+126,
+163,
+138
+]
+},
+{
+"pg": 3,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+96,
+137,
+108
+]
+},
+{
+"pg": 3,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+76,
+214,
+88
+]
+},
+{
+"pg": 3,
+"type": "Link",
+"txt": "",
+"rect": [
+92,
+58,
+183,
+68
+]
+},
+{
+"pg": 3,
+"type": "Highlight",
+"txt": "something is wrong with the hyperlinks also list of tables/figures is misisng",
+"rect": [
+56,
+471,
+539,
+564
+]
+},
+{
+"pg": 4,
+"type": "Link",
+"txt": "",
+"rect": [
+92,
+771,
+186,
+783
+]
+},
+{
+"pg": 4,
+"type": "Link",
+"txt": "",
+"rect": [
+92,
+751,
+268,
+762
+]
+},
+{
+"pg": 4,
+"type": "Link",
+"txt": "",
+"rect": [
+92,
+730,
+345,
+742
+]
+},
+{
+"pg": 4,
+"type": "Link",
+"txt": "",
+"rect": [
+92,
+710,
+360,
+722
+]
+},
+{
+"pg": 4,
+"type": "Link",
+"txt": "",
+"rect": [
+92,
+689,
+246,
+701
+]
+},
+{
+"pg": 4,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+669,
+236,
+681
+]
+},
+{
+"pg": 4,
+"type": "Link",
+"txt": "",
+"rect": [
+92,
+651,
+205,
+661
+]
+},
+{
+"pg": 4,
+"type": "Link",
+"txt": "",
+"rect": [
+92,
+631,
+269,
+640
+]
+},
+{
+"pg": 4,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+599,
+154,
+611
+]
+},
+{
+"pg": 4,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+578,
+259,
+590
+]
+},
+{
+"pg": 4,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+560,
+164,
+570
+]
+},
+{
+"pg": 4,
+"type": "Link",
+"txt": "",
+"rect": [
+92,
+538,
+206,
+550
+]
+},
+{
+"pg": 4,
+"type": "Link",
+"txt": "",
+"rect": [
+92,
+518,
+278,
+529
+]
+},
+{
+"pg": 4,
+"type": "Link",
+"txt": "",
+"rect": [
+92,
+499,
+294,
+509
+]
+},
+{
+"pg": 4,
+"type": "Link",
+"txt": "",
+"rect": [
+92,
+477,
+202,
+489
+]
+},
+{
+"pg": 4,
+"type": "Link",
+"txt": "",
+"rect": [
+92,
+456,
+320,
+468
+]
+},
+{
+"pg": 4,
+"type": "Link",
+"txt": "",
+"rect": [
+92,
+436,
+208,
+448
+]
+},
+{
+"pg": 4,
+"type": "Link",
+"txt": "",
+"rect": [
+92,
+418,
+268,
+428
+]
+},
+{
+"pg": 4,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+395,
+277,
+407
+]
+},
+{
+"pg": 4,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+375,
+221,
+387
+]
+},
+{
+"pg": 4,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+348,
+106,
+357
+]
+},
+{
+"pg": 4,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+325,
+184,
+337
+]
+},
+{
+"pg": 4,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+304,
+179,
+316
+]
+},
+{
+"pg": 4,
+"type": "Link",
+"txt": "",
+"rect": [
+92,
+284,
+247,
+296
+]
+},
+{
+"pg": 4,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+264,
+230,
+276
+]
+},
+{
+"pg": 4,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+246,
+158,
+255
+]
+},
+{
+"pg": 4,
+"type": "Link",
+"txt": "",
+"rect": [
+92,
+223,
+232,
+235
+]
+},
+{
+"pg": 4,
+"type": "Link",
+"txt": "",
+"rect": [
+92,
+203,
+200,
+215
+]
+},
+{
+"pg": 4,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+183,
+231,
+194
+]
+},
+{
+"pg": 4,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+162,
+210,
+174
+]
+},
+{
+"pg": 4,
+"type": "Link",
+"txt": "",
+"rect": [
+92,
+144,
+257,
+154
+]
+},
+{
+"pg": 4,
+"type": "Link",
+"txt": "",
+"rect": [
+92,
+122,
+209,
+133
+]
+},
+{
+"pg": 4,
+"type": "Link",
+"txt": "",
+"rect": [
+92,
+104,
+154,
+113
+]
+},
+{
+"pg": 4,
+"type": "Link",
+"txt": "",
+"rect": [
+92,
+81,
+169,
+92
+]
+},
+{
+"pg": 5,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+773,
+125,
+783
+]
+},
+{
+"pg": 5,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+750,
+138,
+762
+]
+},
+{
+"pg": 5,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+730,
+157,
+742
+]
+},
+{
+"pg": 5,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+712,
+158,
+722
+]
+},
+{
+"pg": 5,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+692,
+146,
+701
+]
+},
+{
+"pg": 5,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+672,
+149,
+681
+]
+},
+{
+"pg": 5,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+639,
+207,
+651
+]
+},
+{
+"pg": 6,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+561,
+309,
+572
+]
+},
+{
+"pg": 6,
+"type": "Link",
+"txt": "",
+"rect": [
+296,
+561,
+303,
+572
+]
+},
+{
+"pg": 6,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+530,
+271,
+542
+]
+},
+{
+"pg": 6,
+"type": "Link",
+"txt": "",
+"rect": [
+260,
+530,
+268,
+542
+]
+},
+{
+"pg": 6,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+509,
+224,
+521
+]
+},
+{
+"pg": 6,
+"type": "Link",
+"txt": "",
+"rect": [
+208,
+509,
+221,
+521
+]
+},
+{
+"pg": 6,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+479,
+540,
+491
+]
+},
+{
+"pg": 6,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+459,
+540,
+471
+]
+},
+{
+"pg": 6,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+438,
+540,
+450
+]
+},
+{
+"pg": 6,
+"type": "Link",
+"txt": "",
+"rect": [
+402,
+440,
+417,
+450
+]
+},
+{
+"pg": 6,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+418,
+540,
+430
+]
+},
+{
+"pg": 6,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+397,
+540,
+410
+]
+},
+{
+"pg": 6,
+"type": "Link",
+"txt": "",
+"rect": [
+318,
+399,
+338,
+409
+]
+},
+{
+"pg": 6,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+377,
+540,
+389
+]
+},
+{
+"pg": 6,
+"type": "Link",
+"txt": "",
+"rect": [
+471,
+379,
+487,
+389
+]
+},
+{
+"pg": 6,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+357,
+323,
+369
+]
+},
+{
+"pg": 6,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+337,
+540,
+349
+]
+},
+{
+"pg": 6,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+316,
+540,
+328
+]
+},
+{
+"pg": 6,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+296,
+439,
+308
+]
+},
+{
+"pg": 6,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+276,
+540,
+288
+]
+},
+{
+"pg": 6,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+255,
+540,
+267
+]
+},
+{
+"pg": 6,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+234,
+540,
+247
+]
+},
+{
+"pg": 6,
+"type": "Link",
+"txt": "",
+"rect": [
+130,
+236,
+146,
+247
+]
+},
+{
+"pg": 6,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+214,
+443,
+227
+]
+},
+{
+"pg": 6,
+"type": "Link",
+"txt": "",
+"rect": [
+113,
+214,
+136,
+227
+]
+},
+{
+"pg": 6,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+195,
+540,
+206
+]
+},
+{
+"pg": 6,
+"type": "Link",
+"txt": "",
+"rect": [
+484,
+195,
+500,
+206
+]
+},
+{
+"pg": 6,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+174,
+540,
+186
+]
+},
+{
+"pg": 6,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+154,
+540,
+166
+]
+},
+{
+"pg": 6,
+"type": "Link",
+"txt": "",
+"rect": [
+402,
+155,
+423,
+165
+]
+},
+{
+"pg": 6,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+134,
+472,
+146
+]
+},
+{
+"pg": 6,
+"type": "Link",
+"txt": "",
+"rect": [
+441,
+135,
+462,
+145
+]
+},
+{
+"pg": 7,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+771,
+540,
+783
+]
+},
+{
+"pg": 7,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+750,
+540,
+762
+]
+},
+{
+"pg": 7,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+729,
+540,
+742
+]
+},
+{
+"pg": 7,
+"type": "Link",
+"txt": "",
+"rect": [
+116,
+731,
+137,
+742
+]
+},
+{
+"pg": 7,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+710,
+540,
+722
+]
+},
+{
+"pg": 7,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+692,
+113,
+701
+]
+},
+{
+"pg": 7,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+659,
+540,
+671
+]
+},
+{
+"pg": 7,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+639,
+540,
+651
+]
+},
+{
+"pg": 7,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+619,
+540,
+630
+]
+},
+{
+"pg": 7,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+598,
+540,
+610
+]
+},
+{
+"pg": 7,
+"type": "Link",
+"txt": "",
+"rect": [
+443,
+598,
+459,
+610
+]
+},
+{
+"pg": 7,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+578,
+286,
+590
+]
+},
+{
+"pg": 7,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+558,
+540,
+570
+]
+},
+{
+"pg": 7,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+537,
+162,
+549
+]
+},
+{
+"pg": 7,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+517,
+478,
+529
+]
+},
+{
+"pg": 7,
+"type": "Link",
+"txt": "",
+"rect": [
+460,
+517,
+475,
+529
+]
+},
+{
+"pg": 7,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+497,
+540,
+509
+]
+},
+{
+"pg": 7,
+"type": "Link",
+"txt": "",
+"rect": [
+399,
+498,
+415,
+508
+]
+},
+{
+"pg": 7,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+476,
+540,
+489
+]
+},
+{
+"pg": 7,
+"type": "Link",
+"txt": "",
+"rect": [
+120,
+476,
+133,
+489
+]
+},
+{
+"pg": 7,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+454,
+540,
+469
+]
+},
+{
+"pg": 7,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+434,
+540,
+449
+]
+},
+{
+"pg": 7,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+415,
+540,
+427
+]
+},
+{
+"pg": 7,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+395,
+540,
+407
+]
+},
+{
+"pg": 7,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+375,
+447,
+388
+]
+},
+{
+"pg": 7,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+344,
+474,
+356
+]
+},
+{
+"pg": 7,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+324,
+540,
+336
+]
+},
+{
+"pg": 7,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+304,
+186,
+316
+]
+},
+{
+"pg": 7,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+283,
+540,
+295
+]
+},
+{
+"pg": 7,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+263,
+540,
+275
+]
+},
+{
+"pg": 7,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+243,
+540,
+255
+]
+},
+{
+"pg": 7,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+222,
+540,
+234
+]
+},
+{
+"pg": 7,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+202,
+290,
+214
+]
+},
+{
+"pg": 7,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+182,
+540,
+194
+]
+},
+{
+"pg": 7,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+161,
+519,
+173
+]
+},
+{
+"pg": 7,
+"type": "Link",
+"txt": "",
+"rect": [
+502,
+161,
+517,
+173
+]
+},
+{
+"pg": 7,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+141,
+540,
+153
+]
+},
+{
+"pg": 7,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+121,
+540,
+133
+]
+},
+{
+"pg": 7,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+100,
+290,
+112
+]
+},
+{
+"pg": 8,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+771,
+540,
+783
+]
+},
+{
+"pg": 8,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+750,
+540,
+762
+]
+},
+{
+"pg": 8,
+"type": "Link",
+"txt": "",
+"rect": [
+210,
+750,
+231,
+762
+]
+},
+{
+"pg": 8,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+730,
+200,
+742
+]
+},
+{
+"pg": 8,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+710,
+540,
+722
+]
+},
+{
+"pg": 8,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+689,
+540,
+701
+]
+},
+{
+"pg": 8,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+669,
+540,
+681
+]
+},
+{
+"pg": 8,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+649,
+351,
+661
+]
+},
+{
+"pg": 8,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+629,
+540,
+640
+]
+},
+{
+"pg": 8,
+"type": "Link",
+"txt": "",
+"rect": [
+494,
+629,
+509,
+640
+]
+},
+{
+"pg": 8,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+608,
+540,
+620
+]
+},
+{
+"pg": 8,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+588,
+267,
+600
+]
+},
+{
+"pg": 8,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+568,
+540,
+579
+]
+},
+{
+"pg": 8,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+547,
+540,
+559
+]
+},
+{
+"pg": 8,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+527,
+540,
+539
+]
+},
+{
+"pg": 8,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+507,
+540,
+519
+]
+},
+{
+"pg": 8,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+486,
+540,
+498
+]
+},
+{
+"pg": 8,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+468,
+166,
+478
+]
+},
+{
+"pg": 8,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+446,
+540,
+458
+]
+},
+{
+"pg": 8,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+425,
+540,
+437
+]
+},
+{
+"pg": 8,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+405,
+540,
+417
+]
+},
+{
+"pg": 8,
+"type": "Link",
+"txt": "",
+"rect": [
+272,
+405,
+296,
+417
+]
+},
+{
+"pg": 8,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+385,
+540,
+397
+]
+},
+{
+"pg": 8,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+364,
+318,
+376
+]
+},
+{
+"pg": 9,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+560,
+409,
+572
+]
+},
+{
+"pg": 9,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+530,
+386,
+542
+]
+},
+{
+"pg": 9,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+499,
+429,
+511
+]
+},
+{
+"pg": 9,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+469,
+540,
+481
+]
+},
+{
+"pg": 9,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+449,
+519,
+461
+]
+},
+{
+"pg": 9,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+428,
+540,
+440
+]
+},
+{
+"pg": 9,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+408,
+540,
+420
+]
+},
+{
+"pg": 9,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+390,
+137,
+400
+]
+},
+{
+"pg": 9,
+"type": "Link",
+"txt": "",
+"rect": [
+119,
+390,
+134,
+400
+]
+},
+{
+"pg": 9,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+367,
+540,
+379
+]
+},
+{
+"pg": 9,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+347,
+438,
+359
+]
+},
+{
+"pg": 9,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+327,
+540,
+339
+]
+},
+{
+"pg": 9,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+307,
+540,
+318
+]
+},
+{
+"pg": 9,
+"type": "Link",
+"txt": "",
+"rect": [
+318,
+307,
+333,
+318
+]
+},
+{
+"pg": 9,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+286,
+232,
+298
+]
+},
+{
+"pg": 9,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+266,
+540,
+278
+]
+},
+{
+"pg": 9,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+246,
+540,
+257
+]
+},
+{
+"pg": 9,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+225,
+540,
+237
+]
+},
+{
+"pg": 9,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+205,
+514,
+217
+]
+},
+{
+"pg": 9,
+"type": "Link",
+"txt": "",
+"rect": [
+70,
+175,
+512,
+187
+]
+},
+{
+"pg": 10,
+"type": "Highlight",
+"txt": "I expect the abbreviations here to mainly reflect the methodology actually used. MPC and ICP are discussed in the state of the art but neither appears in the proposed method.",
+"rect": [
+200,
+453,
+383,
+486
+]
+},
+{
+"pg": 11,
+"type": "Highlight",
+"txt": "you could improve this section with figures.\r\rMorever, this section motivates an integrated perception-planning-control problem, but this is not what is eventually implemented. Make sure that the motivation is aligned with the actual problem solved in the thesis.",
+"rect": [
+56,
+534,
+156,
+550
+]
+},
+{
+"pg": 11,
+"type": "Highlight",
+"txt": "\u201cRobustly\u201d is a strong statement. Robust with respect to what uncertainty/perturbation? This needs to lead to a precise problem definition and an evaluation criterion later.",
+"rect": [
+366,
+178,
+539,
+190
+]
+},
+{
+"pg": 12,
+"type": "Link",
+"txt": "",
+"rect": [
+392,
+536,
+399,
+548
+]
+},
+{
+"pg": 12,
+"type": "Highlight",
+"txt": "I don't think Chapter 4 actually establishes this relation. You derive a contact wrench, but you do not obtain a complete force-to-object-motion model because the table/support friction wrench is missing. Please revisit this after correcting Chapter 4.",
+"rect": [
+56,
+618,
+539,
+651
+]
+},
+{
+"pg": 12,
+"type": "Highlight",
+"txt": "The outline should eventually make clear where the actual methodological contribution lies. At the moment it reads mainly as an implementation architecture rather than a new control methodology.",
+"rect": [
+56,
+598,
+303,
+610
+]
+},
+{
+"pg": 13,
+"type": "Link",
+"txt": "",
+"rect": [
+253,
+201,
+268,
+213
+]
+},
+{
+"pg": 13,
+"type": "Highlight",
+"txt": "The main agreed constrained-control objective is missing. Mapping a Cartesian command through the manipulator Jacobian is standard robot control and does not replace the requested constrained-control methodology. Where are robot limits/contact constraints explicitly incorporated into the control law? This is a central gap in the thesis.\r\rMorever, This is not technically correct as written. The Jacobian in your work does not map a desired Cartesian velocity directly to joint torque. In your implementation the velocity error is first converted to a virtual Cartesian force and J^T then maps this force to joint torque.",
+"rect": [
+56,
+202,
+539,
+275
+]
+},
+{
+"pg": 13,
+"type": "Highlight",
+"txt": "This sounds like a contact-planning problem. However, the eventual implementation selects the nearest cube face or the radial direction of the cylinder. Is an actual planning problem being solved here? Please formulate precisely what the technical problem is and what method you developed to solve it.",
+"rect": [
+56,
+502,
+470,
+514
+]
+},
+{
+"pg": 13,
+"type": "Highlight",
+"txt": "\u201cEfficient\u201d and \u201crobust\u201d need measurable definitions. What metric defines efficiency and what uncertainty/variation defines robustness? Otherwise these cannot be evaluated later.",
+"rect": [
+56,
+578,
+403,
+590
+]
+},
+{
+"pg": 13,
+"type": "Highlight",
+"txt": "These objectives currently describe implementation steps rather than a clear research/control problem. I still do not see the constrained-control objective here.",
+"rect": [
+56,
+166,
+284,
+178
+]
+},
+{
+"pg": 14,
+"type": "Link",
+"txt": "",
+"rect": [
+418,
+389,
+425,
+404
+]
+},
+{
+"pg": 14,
+"type": "Highlight",
+"txt": "I would not call these independent sensing sources. Both are obtained from the simulated state/contact geometry. One is Drake's contact result and the other is computed from simulated penetration.",
+"rect": [
+73,
+751,
+324,
+763
+]
+},
+{
+"pg": 14,
+"type": "Highlight",
+"txt": "How would this penetration be measured on the real system? In Drake it is directly available from the simulated geometry, but this is not generally an available physical measurement. Please make the simulation-specific assumption explicit.",
+"rect": [
+56,
+690,
+539,
+723
+]
+},
+{
+"pg": 15,
+"type": "Link",
+"txt": "",
+"rect": [
+202,
+401,
+218,
+413
+]
+},
+{
+"pg": 15,
+"type": "Highlight",
+"txt": "This is important, but later your proposed controller does not explicitly enforce most of the system constraints you introduce. The state of the art should lead to the actual constraint-handling methodology used in the thesis.",
+"rect": [
+56,
+497,
+539,
+529
+]
+},
+{
+"pg": 15,
+"type": "Highlight",
+"txt": "This again suggests an integrated perception/planning/control contribution. Be careful not to motivate a substantially broader problem than the methodology actually addresses\r.",
+"rect": [
+56,
+219,
+539,
+251
+]
+},
+{
+"pg": 16,
+"type": "Link",
+"txt": "",
+"rect": [
+401,
+571,
+409,
+586
+]
+},
+{
+"pg": 16,
+"type": "Link",
+"txt": "",
+"rect": [
+121,
+432,
+128,
+444
+]
+},
+{
+"pg": 16,
+"type": "Link",
+"txt": "",
+"rect": [
+159,
+392,
+166,
+404
+]
+},
+{
+"pg": 16,
+"type": "Link",
+"txt": "",
+"rect": [
+288,
+310,
+295,
+322
+]
+},
+{
+"pg": 16,
+"type": "Highlight",
+"txt": "This is highly relevant to the quasi-static pushing model, but you do not actually use a limit-surface/support-friction relation in Chapter 4. If you want to derive object motion under quasi-static pushing later, this missing part becomes important.",
+"rect": [
+56,
+291,
+539,
+323
+]
+},
+{
+"pg": 16,
+"type": "Highlight",
+"txt": "Good point, but then the methodology/results should actually measure the contact location and friction-related quantities used to explain the trajectory.",
+"rect": [
+56,
+189,
+539,
+222
+]
+},
+{
+"pg": 17,
+"type": "Link",
+"txt": "",
+"rect": [
+204,
+723,
+211,
+735
+]
+},
+{
+"pg": 17,
+"type": "Link",
+"txt": "",
+"rect": [
+152,
+517,
+159,
+529
+]
+},
+{
+"pg": 17,
+"type": "Link",
+"txt": "",
+"rect": [
+529,
+371,
+536,
+383
+]
+},
+{
+"pg": 17,
+"type": "Link",
+"txt": "",
+"rect": [
+251,
+270,
+263,
+282
+]
+},
+{
+"pg": 17,
+"type": "Link",
+"txt": "",
+"rect": [
+350,
+124,
+362,
+136
+]
+},
+{
+"pg": 17,
+"type": "Link",
+"txt": "",
+"rect": [
+171,
+104,
+183,
+116
+]
+},
+{
+"pg": 17,
+"type": "Highlight",
+"txt": "This is directly related to the original constrained-control objective. Why was constraint enforcement then not carried into your proposed method? The gap/choice of methodology needs to be explained.",
+"rect": [
+56,
+663,
+539,
+695
+]
+},
+{
+"pg": 18,
+"type": "Link",
+"txt": "",
+"rect": [
+341,
+689,
+353,
+701
+]
+},
+{
+"pg": 18,
+"type": "Link",
+"txt": "",
+"rect": [
+300,
+669,
+313,
+681
+]
+},
+{
+"pg": 18,
+"type": "Link",
+"txt": "",
+"rect": [
+317,
+669,
+329,
+681
+]
+},
+{
+"pg": 18,
+"type": "Link",
+"txt": "",
+"rect": [
+334,
+669,
+346,
+681
+]
+},
+{
+"pg": 18,
+"type": "Link",
+"txt": "",
+"rect": [
+92,
+449,
+105,
+461
+]
+},
+{
+"pg": 18,
+"type": "Link",
+"txt": "",
+"rect": [
+184,
+367,
+196,
+379
+]
+},
+{
+"pg": 18,
+"type": "Link",
+"txt": "",
+"rect": [
+270,
+243,
+282,
+254
+]
+},
+{
+"pg": 18,
+"type": "Link",
+"txt": "",
+"rect": [
+336,
+120,
+351,
+132
+]
+},
+{
+"pg": 18,
+"type": "Highlight",
+"txt": "Since this is the method most closely related to your work, I expect a much more detailed comparison here: what exactly do you take unchanged from [19], what do you modify, and what is genuinely new in your thesis?",
+"rect": [
+56,
+243,
+288,
+255
+]
+},
+{
+"pg": 18,
+"type": "Highlight",
+"txt": "I don't think this is an accurate description of the gap. [19] uses a UR10 mounted on a Ridgeback, but the arm joints are fixed and only the mobile base is controlled. Therefore controlling the Panda arm is a change in the actuation/control interface. However, this alone is not sufficient as a methodological contribution. Please identify what non-trivial manipulator-specific problem you solve here, e.g. redundancy, joint/workspace limits, torque/velocity constraints or singularity handling.",
+"rect": [
+56,
+141,
+539,
+174
+]
+},
+{
+"pg": 18,
+"type": "Highlight",
+"txt": "This cannot be the main thesis gap as currently written. What difficulty specifically introduced by the Panda do you solve? Joint limits? Redundancy? Torque constraints? Workspace? Singularities? None of these currently appear as an actual control contribution.",
+"rect": [
+56,
+121,
+539,
+154
+]
+},
+{
+"pg": 19,
+"type": "Link",
+"txt": "",
+"rect": [
+373,
+582,
+385,
+597
+]
+},
+{
+"pg": 19,
+"type": "Link",
+"txt": "",
+"rect": [
+94,
+495,
+106,
+507
+]
+},
+{
+"pg": 19,
+"type": "Link",
+"txt": "",
+"rect": [
+220,
+495,
+232,
+507
+]
+},
+{
+"pg": 19,
+"type": "Link",
+"txt": "",
+"rect": [
+150,
+454,
+162,
+466
+]
+},
+{
+"pg": 19,
+"type": "Link",
+"txt": "",
+"rect": [
+421,
+454,
+433,
+466
+]
+},
+{
+"pg": 19,
+"type": "Link",
+"txt": "",
+"rect": [
+412,
+318,
+425,
+330
+]
+},
+{
+"pg": 19,
+"type": "Link",
+"txt": "",
+"rect": [
+475,
+277,
+487,
+289
+]
+},
+{
+"pg": 19,
+"type": "Link",
+"txt": "",
+"rect": [
+524,
+257,
+536,
+269
+]
+},
+{
+"pg": 19,
+"type": "Link",
+"txt": "",
+"rect": [
+346,
+237,
+359,
+249
+]
+},
+{
+"pg": 19,
+"type": "Link",
+"txt": "",
+"rect": [
+446,
+216,
+458,
+228
+]
+},
+{
+"pg": 19,
+"type": "Highlight",
+"txt": "Please check this citation. [21] is the Contact Particle Filter for detecting/localising external contact using proprioceptive sensing; it does not appear to be a simple geometry/penetration force estimator of the type you implement later.",
+"rect": [
+169,
+455,
+439,
+467
+]
+},
+{
+"pg": 19,
+"type": "Highlight",
+"txt": "This statement also needs qualification because your main reference [19] is specifically designed to operate without online slider pose feedback. Your methodology later does use object position continuously in several places, so clearly explain what information your controller actually requires versus what [19] requires.",
+"rect": [
+56,
+339,
+311,
+351
+]
+},
+{
+"pg": 19,
+"type": "Highlight",
+"txt": "This literature is about actual object detection/pose estimation, but none of these methods is implemented in the thesis. If the thesis only assumes a noisy object-state measurement, I would strongly reduce the claim that perception is part of the contribution.",
+"rect": [
+56,
+369,
+264,
+386
+]
+},
+{
+"pg": 20,
+"type": "Link",
+"txt": "",
+"rect": [
+83,
+739,
+99,
+751
+]
+},
+{
+"pg": 20,
+"type": "Link",
+"txt": "",
+"rect": [
+284,
+626,
+291,
+637
+]
+},
+{
+"pg": 20,
+"type": "Link",
+"txt": "",
+"rect": [
+196,
+601,
+203,
+616
+]
+},
+{
+"pg": 20,
+"type": "Link",
+"txt": "",
+"rect": [
+223,
+519,
+231,
+534
+]
+},
+{
+"pg": 20,
+"type": "Link",
+"txt": "",
+"rect": [
+234,
+519,
+241,
+534
+]
+},
+{
+"pg": 20,
+"type": "Link",
+"txt": "",
+"rect": [
+232,
+458,
+239,
+473
+]
+},
+{
+"pg": 20,
+"type": "Link",
+"txt": "",
+"rect": [
+242,
+396,
+255,
+412
+]
+},
+{
+"pg": 20,
+"type": "Link",
+"txt": "",
+"rect": [
+258,
+396,
+270,
+412
+]
+},
+{
+"pg": 20,
+"type": "Link",
+"txt": "",
+"rect": [
+248,
+340,
+260,
+351
+]
+},
+{
+"pg": 20,
+"type": "Link",
+"txt": "",
+"rect": [
+263,
+340,
+276,
+351
+]
+},
+{
+"pg": 20,
+"type": "Link",
+"txt": "",
+"rect": [
+279,
+340,
+291,
+351
+]
+},
+{
+"pg": 20,
+"type": "Link",
+"txt": "",
+"rect": [
+196,
+315,
+208,
+330
+]
+},
+{
+"pg": 20,
+"type": "Link",
+"txt": "",
+"rect": [
+229,
+258,
+242,
+268
+]
+},
+{
+"pg": 20,
+"type": "Link",
+"txt": "",
+"rect": [
+246,
+258,
+258,
+268
+]
+},
+{
+"pg": 20,
+"type": "Link",
+"txt": "",
+"rect": [
+262,
+258,
+275,
+268
+]
+},
+{
+"pg": 20,
+"type": "Link",
+"txt": "",
+"rect": [
+279,
+258,
+291,
+268
+]
+},
+{
+"pg": 20,
+"type": "Link",
+"txt": "",
+"rect": [
+196,
+233,
+208,
+248
+]
+},
+{
+"pg": 21,
+"type": "Highlight",
+"txt": "This is a strong statement. The manipulator side is straightforward, but the object side later does not contain the table/support friction wrench required to determine planar sliding motion. Please make sure the model actually establishes what this sentence claims.",
+"rect": [
+56,
+517,
+539,
+550
+]
+},
+{
+"pg": 22,
+"type": "Link",
+"txt": "",
+"rect": [
+487,
+451,
+502,
+461
+]
+},
+{
+"pg": 22,
+"type": "Link",
+"txt": "",
+"rect": [
+518,
+316,
+533,
+327
+]
+},
+{
+"pg": 22,
+"type": "Link",
+"txt": "",
+"rect": [
+207,
+295,
+231,
+307
+]
+},
+{
+"pg": 22,
+"type": "Link",
+"txt": "",
+"rect": [
+323,
+296,
+338,
+307
+]
+},
+{
+"pg": 22,
+"type": "Highlight",
+"txt": "Please justify the quasi-static assumption quantitatively based on the commanded velocity/acceleration and expected force scales. Later several result explanations rely explicitly on inertia, which becomes inconsistent with this assumption.",
+"rect": [
+84,
+553,
+241,
+565
+]
+},
+{
+"pg": 22,
+"type": "Highlight",
+"txt": "The object is sliding on a table, so where is the table/support friction wrench in this equation? This is fundamental to planar pushing. F_o==Gf_c cannot be the complete net wrench if Coulomb friction with the table is also assumed.",
+"rect": [
+245,
+413,
+539,
+428
+]
+},
+{
+"pg": 22,
+"type": "Highlight",
+"txt": "This is not correct if F_o is the net planar wrench. The contact wrench from the pusher is only one component; the support-friction wrench from the table must also appear.",
+"rect": [
+139,
+316,
+353,
+328
+]
+},
+{
+"pg": 22,
+"type": "Highlight",
+"txt": "Which algebraic relation exactly? Neglecting acceleration does not by itself provide a force-to-object-velocity relation. Under quasi-static pushing you still need the support-friction/limit-surface relation. Also, later you state that the controller does not use the object's dynamics. Please make this consistent.",
+"rect": [
+56,
+235,
+539,
+267
+]
+},
+{
+"pg": 23,
+"type": "Link",
+"txt": "",
+"rect": [
+312,
+685,
+335,
+697
+]
+},
+{
+"pg": 23,
+"type": "Link",
+"txt": "",
+"rect": [
+357,
+685,
+380,
+697
+]
+},
+{
+"pg": 23,
+"type": "Link",
+"txt": "",
+"rect": [
+273,
+340,
+288,
+350
+]
+},
+{
+"pg": 23,
+"type": "Link",
+"txt": "",
+"rect": [
+80,
+313,
+101,
+323
+]
+},
+{
+"pg": 23,
+"type": "Link",
+"txt": "",
+"rect": [
+185,
+299,
+201,
+309
+]
+},
+{
+"pg": 23,
+"type": "Link",
+"txt": "",
+"rect": [
+332,
+221,
+356,
+233
+]
+},
+{
+"pg": 23,
+"type": "Link",
+"txt": "",
+"rect": [
+286,
+181,
+310,
+192
+]
+},
+{
+"pg": 23,
+"type": "Link",
+"txt": "",
+"rect": [
+480,
+99,
+503,
+111
+]
+},
+{
+"pg": 23,
+"type": "Highlight",
+"txt": "Check the coordinate frames. You define f_n and f_t in the local contact frame but Eq. (4.4) inserts them directly as the first two components of the object wrench. In the general case you need the appropriate rotation into the frame in which Fo is expressed.",
+"rect": [
+190,
+666,
+531,
+678
+]
+},
+{
+"pg": 23,
+"type": "Highlight",
+"txt": "I don't yet see the equation that actually maps this wrench to the quasi-static object twist. Radius of gyration alone does not provide that relation. The support friction/limit-surface model is still missing.",
+"rect": [
+56,
+120,
+539,
+153
+]
+},
+{
+"pg": 24,
+"type": "Link",
+"txt": "",
+"rect": [
+436,
+730,
+451,
+742
+]
+},
+{
+"pg": 24,
+"type": "Link",
+"txt": "",
+"rect": [
+341,
+226,
+354,
+236
+]
+},
+{
+"pg": 24,
+"type": "Link",
+"txt": "",
+"rect": [
+515,
+188,
+530,
+198
+]
+},
+{
+"pg": 24,
+"type": "Link",
+"txt": "",
+"rect": [
+429,
+173,
+452,
+185
+]
+},
+{
+"pg": 24,
+"type": "Link",
+"txt": "",
+"rect": [
+411,
+112,
+426,
+122
+]
+},
+{
+"pg": 24,
+"type": "Link",
+"txt": "",
+"rect": [
+197,
+91,
+212,
+102
+]
+},
+{
+"pg": 24,
+"type": "Highlight",
+"txt": "This is presented as a conclusion before it has been demonstrated. If py is claimed to be the dominant factor, please measure/report py, fn\u200b, ft and the corresponding torque terms in the results. \r\rOr if this was something you read from a paper thejn please cite the paper/work.",
+"rect": [
+56,
+771,
+317,
+784
+]
+},
+{
+"pg": 24,
+"type": "Highlight",
+"txt": "This is exactly the quantity you later use to explain the object's rotation. Why is this important state not explicitly controlled or at least measured/logged?",
+"rect": [
+56,
+532,
+539,
+564
+]
+},
+{
+"pg": 24,
+"type": "Highlight",
+"txt": "Be careful with the side-view torque interpretation. The later planar torque \u03c4_o=a*f_t\u2212p_y *f_n\r is yaw about the vertical axis; the side-view drawing can easily be interpreted as a different rotation axis. Make the torque axis explicit.",
+"rect": [
+56,
+428,
+106,
+440
+]
+},
+{
+"pg": 25,
+"type": "Link",
+"txt": "",
+"rect": [
+169,
+657,
+185,
+669
+]
+},
+{
+"pg": 25,
+"type": "Link",
+"txt": "",
+"rect": [
+150,
+637,
+171,
+648
+]
+},
+{
+"pg": 25,
+"type": "Link",
+"txt": "",
+"rect": [
+122,
+617,
+137,
+628
+]
+},
+{
+"pg": 25,
+"type": "Link",
+"txt": "",
+"rect": [
+166,
+419,
+186,
+429
+]
+},
+{
+"pg": 25,
+"type": "Link",
+"txt": "",
+"rect": [
+415,
+377,
+430,
+389
+]
+},
+{
+"pg": 25,
+"type": "Link",
+"txt": "",
+"rect": [
+470,
+358,
+485,
+368
+]
+},
+{
+"pg": 25,
+"type": "Link",
+"txt": "",
+"rect": [
+496,
+336,
+511,
+348
+]
+},
+{
+"pg": 25,
+"type": "Link",
+"txt": "",
+"rect": [
+123,
+318,
+146,
+328
+]
+},
+{
+"pg": 25,
+"type": "Link",
+"txt": "",
+"rect": [
+378,
+230,
+401,
+243
+]
+},
+{
+"pg": 25,
+"type": "Highlight",
+"txt": "Why is it acceptable for the implementation to neglect (a*f_t)? Please verify this assumption from the actual simulated forces. Later you explicitly say that at high friction the tangential term becomes important, which would invalidate this simplification exactly in the difficult cases.",
+"rect": [
+85,
+693,
+539,
+743
+]
+},
+{
+"pg": 25,
+"type": "Highlight",
+"txt": "Then what role does this derivation play in the proposed methodology? At the moment a considerable amount of mathematical modelling is introduced but not used by the controller. Please distinguish clearly between background analysis and actual method.",
+"rect": [
+56,
+398,
+539,
+430
+]
+},
+{
+"pg": 26,
+"type": "Link",
+"txt": "",
+"rect": [
+508,
+570,
+524,
+584
+]
+},
+{
+"pg": 26,
+"type": "Link",
+"txt": "",
+"rect": [
+294,
+544,
+315,
+555
+]
+},
+{
+"pg": 26,
+"type": "Link",
+"txt": "",
+"rect": [
+283,
+531,
+304,
+541
+]
+},
+{
+"pg": 26,
+"type": "Link",
+"txt": "",
+"rect": [
+509,
+342,
+530,
+352
+]
+},
+{
+"pg": 26,
+"type": "Link",
+"txt": "",
+"rect": [
+517,
+274,
+540,
+286
+]
+},
+{
+"pg": 26,
+"type": "Link",
+"txt": "",
+"rect": [
+76,
+214,
+97,
+224
+]
+},
+{
+"pg": 26,
+"type": "Link",
+"txt": "",
+"rect": [
+173,
+57,
+196,
+70
+]
+},
+{
+"pg": 26,
+"type": "Highlight",
+"txt": "Correct only under the ideal point-contact geometry you assume. Please keep the claim within these assumptions rather than treating this as a general property of cylinder pushing.",
+"rect": [
+99,
+99,
+353,
+111
+]
+},
+{
+"pg": 26,
+"type": "Highlight",
+"txt": "This conclusion should be demonstrated experimentally before being stated here. Also, your cube and cylinder are later given different characteristic dimensions, so the comparison does not isolate shape alone.",
+"rect": [
+205,
+58,
+509,
+71
+]
+},
+{
+"pg": 27,
+"type": "Link",
+"txt": "",
+"rect": [
+462,
+387,
+469,
+399
+]
+},
+{
+"pg": 27,
+"type": "Link",
+"txt": "",
+"rect": [
+515,
+388,
+536,
+399
+]
+},
+{
+"pg": 27,
+"type": "Link",
+"txt": "",
+"rect": [
+168,
+326,
+184,
+338
+]
+},
+{
+"pg": 27,
+"type": "Link",
+"txt": "",
+"rect": [
+139,
+290,
+155,
+302
+]
+},
+{
+"pg": 27,
+"type": "Highlight",
+"txt": "This is already interpreting the later benchmark inside the modelling chapter. I would move this discussion to the results and support it with measured force/contact quantities rather than mixing observation and model here.",
+"rect": [
+56,
+731,
+539,
+784
+]
+},
+{
+"pg": 27,
+"type": "Highlight",
+"txt": "Again, this confirms that the inertia derivation is not part of the actual controller. Please avoid presenting unused theoretical quantities as though they are the basis of the control methodology.",
+"rect": [
+56,
+347,
+539,
+380
+]
+},
+{
+"pg": 27,
+"type": "Highlight",
+"txt": "\u201cDominant\u201d is an assumption for the cube and needs validation from \r\ra*f_t versus p_y*f_n. \r\rPlease do not state this categorically without showing the relative magnitudes.",
+"rect": [
+101,
+217,
+213,
+229
+]
+},
+{
+"pg": 27,
+"type": "Highlight",
+"txt": "Define the sign convention carefully. If f_c is the force applied by the robot on the object, the force acting back on the robot is \u2212f_c. As written, Eqs. (4.15) and (4.16) appear to use the same force sign on both bodies.",
+"rect": [
+56,
+71,
+539,
+104
+]
+},
+{
+"pg": 27,
+"type": "Highlight",
+"txt": "The sphere center is not the physical contact point. If the force contains a tangential component, a force applied at the sphere surface can also create a moment about the sphere/tool frame. Please justify this simplification.",
+"rect": [
+315,
+71,
+495,
+83
+]
+},
+{
+"pg": 28,
+"type": "Link",
+"txt": "",
+"rect": [
+433,
+698,
+453,
+709
+]
+},
+{
+"pg": 28,
+"type": "Link",
+"txt": "",
+"rect": [
+498,
+698,
+514,
+709
+]
+},
+{
+"pg": 28,
+"type": "Link",
+"txt": "",
+"rect": [
+76,
+678,
+91,
+688
+]
+},
+{
+"pg": 28,
+"type": "Link",
+"txt": "",
+"rect": [
+136,
+678,
+151,
+688
+]
+},
+{
+"pg": 28,
+"type": "Link",
+"txt": "",
+"rect": [
+107,
+581,
+128,
+592
+]
+},
+{
+"pg": 28,
+"type": "Link",
+"txt": "",
+"rect": [
+137,
+581,
+157,
+592
+]
+},
+{
+"pg": 28,
+"type": "Link",
+"txt": "",
+"rect": [
+471,
+561,
+492,
+571
+]
+},
+{
+"pg": 28,
+"type": "Link",
+"txt": "",
+"rect": [
+313,
+539,
+336,
+551
+]
+},
+{
+"pg": 28,
+"type": "Link",
+"txt": "",
+"rect": [
+382,
+520,
+402,
+531
+]
+},
+{
+"pg": 28,
+"type": "Link",
+"txt": "",
+"rect": [
+76,
+480,
+91,
+490
+]
+},
+{
+"pg": 28,
+"type": "Link",
+"txt": "",
+"rect": [
+201,
+403,
+217,
+415
+]
+},
+{
+"pg": 28,
+"type": "Link",
+"txt": "",
+"rect": [
+269,
+189,
+284,
+201
+]
+},
+{
+"pg": 28,
+"type": "Highlight",
+"txt": "I still do not see this \u201cdirect kinematic relation\u201d. Please write it explicitly and derive it. As currently written, Eq. (4.16) simply becomes a force-balance equation when inertia is neglected.",
+"rect": [
+56,
+540,
+539,
+573
+]
+},
+{
+"pg": 28,
+"type": "Highlight",
+"txt": "Eq. (4.15) does not map commanded velocity to torque. The later impedance controller converts velocity error into a Cartesian virtual force, which is then mapped through J^T. Please correct this description.",
+"rect": [
+56,
+479,
+539,
+532
+]
+},
+{
+"pg": 28,
+"type": "Highlight",
+"txt": "This section is important, but the key question is: where are these constraints actually incorporated into the controller? Merely listing them is not a constrained-control method.",
+"rect": [
+56,
+434,
+281,
+451
+]
+},
+{
+"pg": 29,
+"type": "Link",
+"txt": "",
+"rect": [
+184,
+265,
+208,
+277
+]
+},
+{
+"pg": 29,
+"type": "Link",
+"txt": "",
+"rect": [
+346,
+267,
+367,
+277
+]
+},
+{
+"pg": 29,
+"type": "Highlight",
+"txt": "Where is this constraint enforced later? I do not see joint-velocity limiting/constraint handling in the control law or results.",
+"rect": [
+56,
+734,
+539,
+784
+]
+},
+{
+"pg": 29,
+"type": "Highlight",
+"txt": "Again, where is this constraint enforced? If the controller is allowed to command forces outside this cone and Drake simply resolves the resulting slip, then this is a system property, not a constraint handled by your controller.",
+"rect": [
+247,
+555,
+539,
+569
+]
+},
+{
+"pg": 29,
+"type": "Highlight",
+"txt": "Where is this validation? I do not see a friction-cone margin/utilisation plotted in Chapter 6.",
+"rect": [
+56,
+246,
+539,
+278
+]
+},
+{
+"pg": 29,
+"type": "Highlight",
+"txt": "This paragraph effectively confirms that no constrained contact-force optimisation is solved. This is a major departure from the expected constrained-control part of the thesis and needs to be addressed, not just explained away.",
+"rect": [
+56,
+246,
+539,
+339
+]
+},
+{
+"pg": 30,
+"type": "Link",
+"txt": "",
+"rect": [
+479,
+230,
+495,
+242
+]
+},
+{
+"pg": 30,
+"type": "Highlight",
+"txt": "I would call this waypoint generation rather than a planner unless there is an actual search/optimisation/feasibility problem being solved.",
+"rect": [
+185,
+515,
+294,
+528
+]
+},
+{
+"pg": 30,
+"type": "Highlight",
+"txt": "This is not open-loop if you subsequently use the Cartesian PD feedback controller of Eq. (5.2). Please correct the terminology.",
+"rect": [
+274,
+495,
+479,
+507
+]
+},
+{
+"pg": 30,
+"type": "Highlight",
+"txt": "How do you guarantee that H and the complete approach path are collision-free? There is no collision-checking/planning method here. It is collision-free only by construction in your simple scene.",
+"rect": [
+224,
+267,
+511,
+279
+]
+},
+{
+"pg": 30,
+"type": "Highlight",
+"txt": "This is fine as a limitation, but it further confirms that this is a predefined approach heuristic rather than a general planning method.",
+"rect": [
+56,
+149,
+248,
+162
+]
+},
+{
+"pg": 31,
+"type": "Link",
+"txt": "",
+"rect": [
+249,
+606,
+262,
+616
+]
+},
+{
+"pg": 31,
+"type": "Link",
+"txt": "",
+"rect": [
+241,
+538,
+257,
+552
+]
+},
+{
+"pg": 31,
+"type": "Link",
+"txt": "",
+"rect": [
+202,
+486,
+222,
+496
+]
+},
+{
+"pg": 31,
+"type": "Link",
+"txt": "",
+"rect": [
+500,
+485,
+516,
+497
+]
+},
+{
+"pg": 31,
+"type": "Link",
+"txt": "",
+"rect": [
+87,
+199,
+103,
+210
+]
+},
+{
+"pg": 31,
+"type": "Link",
+"txt": "",
+"rect": [
+144,
+159,
+165,
+169
+]
+},
+{
+"pg": 31,
+"type": "Link",
+"txt": "",
+"rect": [
+168,
+56,
+183,
+68
+]
+},
+{
+"pg": 31,
+"type": "Highlight",
+"txt": "Please check the gravity sign convention against Eq. (4.1) gravity compensation would normally enter with the opposite sign unless your g(q) variable is defined differently. Make the convention consistent.",
+"rect": [
+439,
+314,
+539,
+327
+]
+},
+{
+"pg": 31,
+"type": "Highlight",
+"txt": "Be precise: there is no camera processing block implemented here. This block takes the simulated ground-truth state and perturbs it according to the synthetic measurement model.",
+"rect": [
+56,
+158,
+539,
+191
+]
+},
+{
+"pg": 32,
+"type": "Link",
+"txt": "",
+"rect": [
+427,
+475,
+442,
+485
+]
+},
+{
+"pg": 32,
+"type": "Link",
+"txt": "",
+"rect": [
+479,
+292,
+495,
+302
+]
+},
+{
+"pg": 32,
+"type": "Link",
+"txt": "",
+"rect": [
+98,
+270,
+113,
+282
+]
+},
+{
+"pg": 32,
+"type": "Highlight",
+"txt": "The Panda has 7 DoF, yet only the translational task is controlled here. What happens to the remaining redundancy/orientation/null-space dynamics? This is one of the non-trivial aspects of applying the Cartesian command to a redundant arm and is not discussed.",
+"rect": [
+240,
+392,
+346,
+407
+]
+},
+{
+"pg": 32,
+"type": "Highlight",
+"txt": "Saturating the resulting torque is not equivalent to designing a controller subject to torque constraints. Saturation changes the commanded behaviour after the control law is calculated and can affect stability/tracking. Please distinguish this clearly.",
+"rect": [
+56,
+109,
+539,
+142
+]
+},
+{
+"pg": 32,
+"type": "Highlight",
+"txt": "Please support this statement more carefully. J^T itself does not create compliance; the compliance comes from the chosen Cartesian impedance/velocity feedback structure.",
+"rect": [
+150,
+89,
+302,
+101
+]
+},
+{
+"pg": 33,
+"type": "Link",
+"txt": "",
+"rect": [
+498,
+650,
+513,
+666
+]
+},
+{
+"pg": 33,
+"type": "Link",
+"txt": "",
+"rect": [
+105,
+617,
+120,
+629
+]
+},
+{
+"pg": 33,
+"type": "Link",
+"txt": "",
+"rect": [
+492,
+190,
+505,
+202
+]
+},
+{
+"pg": 33,
+"type": "Highlight",
+"txt": "What is the controller update frequency? All your discrete filters depend on the sampling period. Without this, coefficients such as D_dhat=0.08 have no reproducible physical time constant.",
+"rect": [
+56,
+411,
+130,
+424
+]
+},
+{
+"pg": 33,
+"type": "Highlight",
+"txt": "This is an empirical observation from your particular controller/scenario. Please either show the corresponding data or avoid introducing a very specific numerical claim without evidence.",
+"rect": [
+110,
+391,
+326,
+406
+]
+},
+{
+"pg": 33,
+"type": "Highlight",
+"txt": "Please separate the original law from your implementation very carefully. Your \u03b4_c is defined using the sphere position relative to the perceived object position, whereas the Force Push paper defines its lateral term relative to the desired pushing path/contact point. These are not automatically the same quantity. If this is your modification, state and derive it explicitly.",
+"rect": [
+308,
+191,
+510,
+203
+]
+},
+{
+"pg": 33,
+"type": "Highlight",
+"txt": "What is the control update frequency/timestep? This is required to interpret the discrete filter coefficients. Without the sampling time, the filters have no reproducible physical time constant.",
+"rect": [
+56,
+232,
+539,
+264
+]
+},
+{
+"pg": 34,
+"type": "Link",
+"txt": "",
+"rect": [
+444,
+770,
+460,
+783
+]
+},
+{
+"pg": 34,
+"type": "Link",
+"txt": "",
+"rect": [
+413,
+582,
+428,
+592
+]
+},
+{
+"pg": 34,
+"type": "Link",
+"txt": "",
+"rect": [
+73,
+567,
+85,
+580
+]
+},
+{
+"pg": 34,
+"type": "Link",
+"txt": "",
+"rect": [
+257,
+383,
+273,
+393
+]
+},
+{
+"pg": 34,
+"type": "Highlight",
+"txt": "I do not think this equivalence is correct as written. In [19], the lateral term is the offset of the contact point from the desired path, whereas your \u03b4_c in Eq. (5.6) is defined from the sphere position relative to the perceived object position. These are different quantities unless you introduce and derive additional assumptions. Either derive the equivalence or present this explicitly as your modification of [19].",
+"rect": [
+56,
+500,
+539,
+539
+]
+},
+{
+"pg": 36,
+"type": "Highlight",
+"txt": "Where does the object velocity used in Eq. (5.14) come from? If this is obtained directly from Drake ground truth, state this explicitly.",
+"rect": [
+318,
+578,
+452,
+590
+]
+},
+{
+"pg": 38,
+"type": "Link",
+"txt": "",
+"rect": [
+174,
+739,
+189,
+751
+]
+},
+{
+"pg": 38,
+"type": "Link",
+"txt": "",
+"rect": [
+373,
+578,
+394,
+588
+]
+},
+{
+"pg": 38,
+"type": "Link",
+"txt": "",
+"rect": [
+380,
+289,
+395,
+301
+]
+},
+{
+"pg": 38,
+"type": "Link",
+"txt": "",
+"rect": [
+481,
+250,
+502,
+260
+]
+},
+{
+"pg": 38,
+"type": "Link",
+"txt": "",
+"rect": [
+284,
+193,
+305,
+204
+]
+},
+{
+"pg": 38,
+"type": "Link",
+"txt": "",
+"rect": [
+183,
+92,
+203,
+102
+]
+},
+{
+"pg": 38,
+"type": "Highlight",
+"txt": "This perception model is inconsistent with the experiments in Section 6.6. Here you define a single measurement taken before the push, whereas later you use repeated measurements at 30 Hz with 80 ms latency and probabilistic frame loss. Please define one complete and consistent measurement model in the methodology before evaluating it.",
+"rect": [
+56,
+659,
+539,
+691
+]
+},
+{
+"pg": 39,
+"type": "Link",
+"txt": "",
+"rect": [
+83,
+739,
+99,
+751
+]
+},
+{
+"pg": 39,
+"type": "Link",
+"txt": "",
+"rect": [
+376,
+578,
+391,
+588
+]
+},
+{
+"pg": 39,
+"type": "Link",
+"txt": "",
+"rect": [
+467,
+555,
+491,
+568
+]
+},
+{
+"pg": 39,
+"type": "Link",
+"txt": "",
+"rect": [
+510,
+555,
+533,
+568
+]
+},
+{
+"pg": 40,
+"type": "Highlight",
+"txt": "Please check the units...Check Eq.5.6",
+"rect": [
+146,
+564,
+370,
+574
+]
+},
+{
+"pg": 41,
+"type": "Link",
+"txt": "",
+"rect": [
+372,
+578,
+380,
+590
+]
+},
+{
+"pg": 41,
+"type": "Link",
+"txt": "",
+"rect": [
+197,
+476,
+212,
+488
+]
+},
+{
+"pg": 41,
+"type": "Link",
+"txt": "",
+"rect": [
+159,
+360,
+174,
+372
+]
+},
+{
+"pg": 41,
+"type": "Link",
+"txt": "",
+"rect": [
+143,
+340,
+159,
+352
+]
+},
+{
+"pg": 41,
+"type": "Highlight",
+"txt": "Be careful with the later interpretation of cube-versus-cylinder results as a \u201cshape\u201d effect. The cube width is 100 mm, whereas the cylinder diameter is 200 mm. Therefore size and rotational inertia also change between the two objects. The current experiment does not isolate shape alone.",
+"rect": [
+56,
+320,
+539,
+353
+]
+},
+{
+"pg": 42,
+"type": "Link",
+"txt": "",
+"rect": [
+245,
+396,
+266,
+406
+]
+},
+{
+"pg": 42,
+"type": "Link",
+"txt": "",
+"rect": [
+87,
+209,
+108,
+221
+]
+},
+{
+"pg": 42,
+"type": "Link",
+"txt": "",
+"rect": [
+155,
+129,
+170,
+139
+]
+},
+{
+"pg": 42,
+"type": "Link",
+"txt": "",
+"rect": [
+91,
+66,
+115,
+81
+]
+},
+{
+"pg": 42,
+"type": "Highlight",
+"txt": "A factor-of-2\u20133 dependence on the simulation timestep is significant. Simply selecting 10^-4s is not sufficient to establish that the result is numerically converged. Please provide a timestep-convergence check, especially because the controller directly uses the simulated contact force.",
+"rect": [
+56,
+273,
+539,
+326
+]
+},
+{
+"pg": 43,
+"type": "Link",
+"txt": "",
+"rect": [
+223,
+772,
+238,
+782
+]
+},
+{
+"pg": 43,
+"type": "Link",
+"txt": "",
+"rect": [
+209,
+669,
+231,
+681
+]
+},
+{
+"pg": 43,
+"type": "Highlight",
+"txt": "do not think this explanation is valid as written. Your own Coulomb relation gives F_theory=\u03bcmg, so the force required to slide the object, and therefore the associated contact torque for a given offset, also generally increases with mass. You cannot assume the same torque while only increasing I_zz. This also needs to be reconciled with the quasi-static assumption.",
+"rect": [
+56,
+710,
+539,
+745
+]
+},
+{
+"pg": 44,
+"type": "Link",
+"txt": "",
+"rect": [
+269,
+156,
+284,
+168
+]
+},
+{
+"pg": 44,
+"type": "Link",
+"txt": "",
+"rect": [
+220,
+136,
+237,
+148
+]
+},
+{
+"pg": 44,
+"type": "Link",
+"txt": "",
+"rect": [
+270,
+116,
+285,
+128
+]
+},
+{
+"pg": 44,
+"type": "Link",
+"txt": "",
+"rect": [
+459,
+116,
+482,
+128
+]
+},
+{
+"pg": 44,
+"type": "Link",
+"txt": "",
+"rect": [
+448,
+55,
+456,
+67
+]
+},
+{
+"pg": 44,
+"type": "Link",
+"txt": "",
+"rect": [
+486,
+55,
+502,
+67
+]
+},
+{
+"pg": 45,
+"type": "Link",
+"txt": "",
+"rect": [
+472,
+757,
+487,
+771
+]
+},
+{
+"pg": 45,
+"type": "Link",
+"txt": "",
+"rect": [
+373,
+330,
+389,
+341
+]
+},
+{
+"pg": 45,
+"type": "Link",
+"txt": "",
+"rect": [
+256,
+191,
+279,
+203
+]
+},
+{
+"pg": 45,
+"type": "Link",
+"txt": "",
+"rect": [
+504,
+151,
+519,
+163
+]
+},
+{
+"pg": 45,
+"type": "Link",
+"txt": "",
+"rect": [
+56,
+131,
+71,
+142
+]
+},
+{
+"pg": 45,
+"type": "Highlight",
+"txt": "This conclusion is not demonstrated by the reported metrics. If torque limits are the cause of failure, show the joint-torque histories/max utilisation or saturation events. The same applies to the joint-position and velocity limits introduced in Chapter 4. Otherwise this should be presented only as a hypothesis.",
+"rect": [
+142,
+151,
+466,
+164
+]
+},
+{
+"pg": 46,
+"type": "Link",
+"txt": "",
+"rect": [
+465,
+330,
+480,
+344
+]
+},
+{
+"pg": 46,
+"type": "Link",
+"txt": "",
+"rect": [
+334,
+191,
+349,
+202
+]
+},
+{
+"pg": 46,
+"type": "Link",
+"txt": "",
+"rect": [
+196,
+75,
+219,
+86
+]
+},
+{
+"pg": 47,
+"type": "Link",
+"txt": "",
+"rect": [
+77,
+771,
+92,
+783
+]
+},
+{
+"pg": 47,
+"type": "Link",
+"txt": "",
+"rect": [
+158,
+686,
+179,
+699
+]
+},
+{
+"pg": 47,
+"type": "Link",
+"txt": "",
+"rect": [
+199,
+686,
+214,
+699
+]
+},
+{
+"pg": 47,
+"type": "Link",
+"txt": "",
+"rect": [
+284,
+606,
+299,
+617
+]
+},
+{
+"pg": 47,
+"type": "Link",
+"txt": "",
+"rect": [
+218,
+463,
+233,
+475
+]
+},
+{
+"pg": 47,
+"type": "Link",
+"txt": "",
+"rect": [
+421,
+423,
+436,
+434
+]
+},
+{
+"pg": 47,
+"type": "Link",
+"txt": "",
+"rect": [
+144,
+305,
+165,
+317
+]
+},
+{
+"pg": 47,
+"type": "Link",
+"txt": "",
+"rect": [
+184,
+305,
+205,
+317
+]
+},
+{
+"pg": 47,
+"type": "Link",
+"txt": "",
+"rect": [
+487,
+285,
+510,
+297
+]
+},
+{
+"pg": 47,
+"type": "Link",
+"txt": "",
+"rect": [
+255,
+266,
+271,
+276
+]
+},
+{
+"pg": 47,
+"type": "Link",
+"txt": "",
+"rect": [
+460,
+144,
+481,
+154
+]
+},
+{
+"pg": 47,
+"type": "Link",
+"txt": "",
+"rect": [
+385,
+123,
+400,
+134
+]
+},
+{
+"pg": 47,
+"type": "Link",
+"txt": "",
+"rect": [
+361,
+102,
+384,
+114
+]
+},
+{
+"pg": 47,
+"type": "Highlight",
+"txt": "The current experiments do not establish a ~30 threshold. You only test a small number of discrete obliquities (approximately 11, 14, 27 and 37 degrees). Either perform an obliquity sweep or remove the quantitative threshold and describe only the observed high-obliquity trend.",
+"rect": [
+56,
+362,
+539,
+395
+]
+},
+{
+"pg": 48,
+"type": "Link",
+"txt": "",
+"rect": [
+168,
+240,
+188,
+252
+]
+},
+{
+"pg": 48,
+"type": "Link",
+"txt": "",
+"rect": [
+147,
+119,
+168,
+130
+]
+},
+{
+"pg": 49,
+"type": "Link",
+"txt": "",
+"rect": [
+104,
+750,
+119,
+762
+]
+},
+{
+"pg": 49,
+"type": "Link",
+"txt": "",
+"rect": [
+450,
+629,
+465,
+640
+]
+},
+{
+"pg": 49,
+"type": "Link",
+"txt": "",
+"rect": [
+517,
+608,
+533,
+620
+]
+},
+{
+"pg": 49,
+"type": "Link",
+"txt": "",
+"rect": [
+417,
+80,
+440,
+91
+]
+},
+{
+"pg": 49,
+"type": "Link",
+"txt": "",
+"rect": [
+463,
+80,
+486,
+91
+]
+},
+{
+"pg": 49,
+"type": "Link",
+"txt": "",
+"rect": [
+167,
+60,
+187,
+70
+]
+},
+{
+"pg": 49,
+"type": "Link",
+"txt": "",
+"rect": [
+383,
+60,
+398,
+70
+]
+},
+{
+"pg": 49,
+"type": "Highlight",
+"txt": "This ablation only shows the effect of disabling two terms within your final implementation. It does not compare the proposed complete controller against the reference Force Push controller [19]. Without that comparison, the improvement/contribution beyond the state of the art is still not quantified.",
+"rect": [
+56,
+79,
+496,
+92
+]
+},
+{
+"pg": 50,
+"type": "Link",
+"txt": "",
+"rect": [
+125,
+750,
+148,
+762
+]
+},
+{
+"pg": 50,
+"type": "Link",
+"txt": "",
+"rect": [
+346,
+730,
+362,
+742
+]
+},
+{
+"pg": 50,
+"type": "Link",
+"txt": "",
+"rect": [
+257,
+649,
+272,
+661
+]
+},
+{
+"pg": 50,
+"type": "Link",
+"txt": "",
+"rect": [
+285,
+593,
+300,
+605
+]
+},
+{
+"pg": 50,
+"type": "Link",
+"txt": "",
+"rect": [
+204,
+327,
+226,
+338
+]
+},
+{
+"pg": 50,
+"type": "Link",
+"txt": "",
+"rect": [
+92,
+286,
+116,
+298
+]
+},
+{
+"pg": 51,
+"type": "Link",
+"txt": "",
+"rect": [
+174,
+649,
+198,
+661
+]
+},
+{
+"pg": 51,
+"type": "Link",
+"txt": "",
+"rect": [
+518,
+465,
+533,
+479
+]
+},
+{
+"pg": 51,
+"type": "Link",
+"txt": "",
+"rect": [
+179,
+359,
+194,
+371
+]
+},
+{
+"pg": 51,
+"type": "Link",
+"txt": "",
+"rect": [
+461,
+339,
+476,
+351
+]
+},
+{
+"pg": 51,
+"type": "Link",
+"txt": "",
+"rect": [
+256,
+279,
+277,
+289
+]
+},
+{
+"pg": 51,
+"type": "Link",
+"txt": "",
+"rect": [
+179,
+237,
+194,
+249
+]
+},
+{
+"pg": 51,
+"type": "Link",
+"txt": "",
+"rect": [
+462,
+132,
+477,
+144
+]
+},
+{
+"pg": 52,
+"type": "Link",
+"txt": "",
+"rect": [
+124,
+730,
+140,
+742
+]
+},
+{
+"pg": 52,
+"type": "Link",
+"txt": "",
+"rect": [
+124,
+504,
+139,
+516
+]
+},
+{
+"pg": 52,
+"type": "Link",
+"txt": "",
+"rect": [
+92,
+155,
+107,
+167
+]
+},
+{
+"pg": 52,
+"type": "Link",
+"txt": "",
+"rect": [
+377,
+53,
+392,
+65
+]
+},
+{
+"pg": 52,
+"type": "Highlight",
+"txt": "This is mathematically incorrect. (1/30)/(1\u2212p) describes an expected inter-observation timescale under independent random frame loss; it is not a worst-case bound. With probabilistic dropout there is no finite maximum number of consecutive lost frames unless you impose one explicitly. Please correct the derivation/wording.",
+"rect": [
+212,
+710,
+390,
+723
+]
+},
+{
+"pg": 53,
+"type": "Link",
+"txt": "",
+"rect": [
+383,
+731,
+403,
+742
+]
+},
+{
+"pg": 53,
+"type": "Link",
+"txt": "",
+"rect": [
+298,
+649,
+321,
+661
+]
+},
+{
+"pg": 53,
+"type": "Link",
+"txt": "",
+"rect": [
+132,
+629,
+155,
+640
+]
+},
+{
+"pg": 53,
+"type": "Link",
+"txt": "",
+"rect": [
+179,
+608,
+200,
+620
+]
+},
+{
+"pg": 53,
+"type": "Link",
+"txt": "",
+"rect": [
+157,
+335,
+181,
+347
+]
+},
+{
+"pg": 53,
+"type": "Link",
+"txt": "",
+"rect": [
+160,
+148,
+181,
+158
+]
+},
+{
+"pg": 54,
+"type": "Link",
+"txt": "",
+"rect": [
+92,
+343,
+115,
+354
+]
+},
+{
+"pg": 54,
+"type": "Highlight",
+"txt": "How many random seeds/repeated trials were used for the noise and frame-drop experiments? Since both are stochastic, one realization per configuration is not sufficient for a robustness claim. Also, the \u201cno degradation\u201d conclusion can only apply to the 50% case: at 90% frame loss the mean lateral deviation increases from 15.8 to 28.3 mm and only 4/8 runs succeed.",
+"rect": [
+56,
+465,
+289,
+477
+]
+},
+{
+"pg": 55,
+"type": "Link",
+"txt": "",
+"rect": [
+176,
+260,
+192,
+272
+]
+},
+{
+"pg": 55,
+"type": "Link",
+"txt": "",
+"rect": [
+244,
+240,
+259,
+251
+]
+},
+{
+"pg": 55,
+"type": "Link",
+"txt": "",
+"rect": [
+72,
+118,
+87,
+130
+]
+},
+{
+"pg": 55,
+"type": "Highlight",
+"txt": "The summary does not accurately describe the implemented controller or the results. The contact-force direction is not the sole feedback used by the controller: object position, object yaw and object velocity are also used in the control laws. In addition, only 28/48 benchmark runs succeed, so \u201cconverges reliably across most of the tested grid\u201d is too strong. Please state the result quantitatively and describe the actual operating region.",
+"rect": [
+163,
+301,
+476,
+313
+]
+},
+{
+"pg": 56,
+"type": "Link",
+"txt": "",
+"rect": [
+479,
+771,
+502,
+783
+]
+},
+{
+"pg": 56,
+"type": "Link",
+"txt": "",
+"rect": [
+287,
+730,
+303,
+742
+]
+},
+{
+"pg": 56,
+"type": "Highlight",
+"txt": "Please substantially revise this contribution list after addressing the comments above. Clearly separate (i) what is reproduced from [19], (ii) what you actually modified/developed, and (iii) what is only an evaluation study. In particular, the \u201ccamera perception model\u201d is a synthetic measurement-degradation model rather than an implemented perception algorithm, and the ablation does not quantify controller-component contributions across mass and friction as claimed. Most importantly, the constrained-control component expected for the thesis is still absent from the proposed methodology.",
+"rect": [
+56,
+564,
+176,
+581
+]
+},
+{
+"pg": 59,
+"type": "Link",
+"txt": "",
+"rect": [
+423,
+348,
+436,
+357
+]
+},
+{
+"pg": 60,
+"type": "Link",
+"txt": "",
+"rect": [
+216,
+540,
+337,
+552
+]
+},
+{
+"pg": 60,
+"type": "Link",
+"txt": "",
+"rect": [
+322,
+515,
+540,
+527
+]
+},
+{
+"pg": 60,
+"type": "Link",
+"txt": "",
+"rect": [
+84,
+496,
+114,
+506
+]
+},
+{
+"pg": 60,
+"type": "Link",
+"txt": "",
+"rect": [
+425,
+449,
+540,
+461
+]
+},
+{
+"pg": 60,
+"type": "Link",
+"txt": "",
+"rect": [
+84,
+429,
+504,
+441
+]
+},
+{
+"pg": 60,
+"type": "Link",
+"txt": "",
+"rect": [
+360,
+364,
+508,
+376
+]
+},
+{
+"pg": 60,
+"type": "Link",
+"txt": "",
+"rect": [
+436,
+319,
+585,
+330
+]
+},
+{
+"pg": 60,
+"type": "Link",
+"txt": "",
+"rect": [
+106,
+209,
+243,
+220
+]
+},
+{
+"pg": 60,
+"type": "Link",
+"txt": "",
+"rect": [
+253,
+163,
+396,
+175
+]
+},
+{
+"pg": 61,
+"type": "Link",
+"txt": "",
+"rect": [
+84,
+732,
+227,
+742
+]
+},
+{
+"pg": 61,
+"type": "Link",
+"txt": "",
+"rect": [
+282,
+621,
+419,
+633
+]
+},
+{
+"pg": 61,
+"type": "Link",
+"txt": "",
+"rect": [
+107,
+556,
+289,
+568
+]
+},
+{
+"pg": 61,
+"type": "Link",
+"txt": "",
+"rect": [
+376,
+511,
+540,
+523
+]
+},
+{
+"pg": 61,
+"type": "Link",
+"txt": "",
+"rect": [
+84,
+493,
+114,
+502
+]
+},
+{
+"pg": 61,
+"type": "Link",
+"txt": "",
+"rect": [
+325,
+337,
+423,
+349
+]
+},
+{
+"pg": 61,
+"type": "Link",
+"txt": "",
+"rect": [
+164,
+293,
+320,
+304
+]
+},
+{
+"pg": 61,
+"type": "Link",
+"txt": "",
+"rect": [
+410,
+248,
+540,
+260
+]
+},
+{
+"pg": 61,
+"type": "Link",
+"txt": "",
+"rect": [
+84,
+230,
+142,
+239
+]
+},
+{
+"pg": 61,
+"type": "Link",
+"txt": "",
+"rect": [
+273,
+163,
+410,
+175
+]
+},
+{
+"pg": 61,
+"type": "Link",
+"txt": "",
+"rect": [
+293,
+98,
+436,
+110
+]
+},
+{
+"pg": 61,
+"type": "Link",
+"txt": "",
+"rect": [
+408,
+53,
+506,
+65
+]
+},
+{
+"pg": 62,
+"type": "Link",
+"txt": "",
+"rect": [
+132,
+731,
+294,
+742
+]
+},
+{
+"pg": 62,
+"type": "Link",
+"txt": "",
+"rect": [
+434,
+685,
+540,
+697
+]
+},
+{
+"pg": 62,
+"type": "Link",
+"txt": "",
+"rect": [
+84,
+667,
+125,
+676
+]
+},
+{
+"pg": 62,
+"type": "Link",
+"txt": "",
+"rect": [
+132,
+601,
+263,
+611
+]
+},
+{
+"pg": 62,
+"type": "Link",
+"txt": "",
+"rect": [
+492,
+554,
+540,
+566
+]
+},
+{
+"pg": 62,
+"type": "Link",
+"txt": "",
+"rect": [
+84,
+536,
+176,
+545
+]
+}
+]

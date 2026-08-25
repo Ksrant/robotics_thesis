@@ -1,0 +1,1794 @@
+=== PAGE 1 ===
+Master thesis
+Perception and control of a robotic
+manipulator for pushing of objects
+Author :
+KEISER Antoine
+Promotors :
+prof. dr. ir. Greet van de Perre
+ir. Mohayad Omer
+2025-2026
+=== PAGE 2 ===
+Abstract
+Non-prehensile pushing offers an attractive alternative to grasping for objects that are too large, heavy, or
+awkwardly shaped to pick up, but it is difficult to control reliably because the pushed object is never rigidly
+constrained and its motion depends on contact location, friction, and object inertia. Reactive pushing con-
+trollers infer this contact information from a contact-force measurement at the end-effector, typically pro-
+vided by a wrist-mounted force/torque sensor or by a tactile fingertip.
+This thesis proposes and evaluates a reactive pushing controller for a 7-DoF manipulator equipped with
+a spherical end-effector and a contact-force sensing capability at that end-effector, modelled in simulation
+by the physics engine’ s contact solver. The measured contact-force direction drives an impedance-based
+control law and the controller is structured as a finite-state machine that separates the approach, pushing,
+and repositioning phases of a push, and is augmented with corrective feedback terms addressing lateral drift
+and directional oscillation, a camera-based perception model alongside a dead-reckoning fallback for han-
+dling occlusion during contact, and a safety mechanism that detects and recovers from stalled or regressing
+pushes.
+The approach is validated in simulations environment across a range of object shapes, masses, friction
+conditions, and initial contact geometries. A study is also effectuated to isolate the contribution of each
+corrective term, revealing that their usefulness depends strongly on object geometry rather than being uni-
+formly beneficial. Targeted experiments further show that the controller tolerates the loss of up to 90% of
+visual observations with no degradation of the pushed trajectory, the residual error being concentrated in
+the stopping decision rather than in the push itself, and quantify the limit case in which the object is never
+re-observed.
+1
+=== PAGE 3 ===
+Contents
+Abstract 1
+List of abbreviations 9
+1 Introduction 10
+1.1 Motivation . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 10
+1.2 Thesis outline . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 11
+2 Objectives 12
+3 State of the art 14
+3.1 Non-prehensile manipulation . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 14
+3.2 Mechanics of planar pushing . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 15
+3.3 Planning and control for pushing . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 15
+3.3.1 Model-based planning and optimisation . . . . . . . . . . . . . . . . . . . . . . . . . . . . 16
+3.3.2 Sampling-based planning . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 16
+3.3.3 Predictive control . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 16
+3.3.4 Feedback and reactive control . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 16
+3.4 Force-feedback and compliant pushing control . . . . . . . . . . . . . . . . . . . . . . . . . . . . 17
+3.4.1 Impedance and admittance control . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 17
+3.4.2 Reactive force-feedback pushing . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 17
+3.4.3 Force estimation without wrist sensors . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 18
+3.5 Perception for manipulation . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 18
+3.6 Summary table . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 19
+4 System model 20
+4.1 Manipulator-object model . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 20
+4.1.1 Robot model . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 20
+2
+=== PAGE 4 ===
+4.1.2 Object model . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 20
+4.1.3 Contact model parametrization . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 21
+4.1.4 Cube: contact geometry and force/torque model . . . . . . . . . . . . . . . . . . . . . . . 22
+4.1.5 Cylinder: contact geometry and force/torque model . . . . . . . . . . . . . . . . . . . . . 24
+4.1.6 Combined dynamic model . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 26
+4.2 Manipulator-object constraints . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 27
+4.2.1 Robot constraints . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 27
+4.2.2 Contact and friction constraints . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 28
+5 Controller design 29
+5.1 Approach and repositioning planner . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 29
+5.2 Push controller . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 30
+5.2.1 Direction filtering . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 32
+5.2.2 Shape-dependent contact normal . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 33
+5.2.3 Contact estimation and confirmation . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 33
+5.2.4 Lateral centering . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 34
+5.2.5 Braking profile and velocity decomposition . . . . . . . . . . . . . . . . . . . . . . . . . . 34
+5.2.6 Vertical regulation . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 35
+5.2.7 Termination and loss of contact . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 35
+5.3 Camera localisation and dead reckoning . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 37
+5.4 Controller parameter values . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 38
+6 Results 40
+6.1 Evaluation protocol . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 40
+6.2 Physical validation . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 41
+6.2.1 Force and speed validation . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 41
+6.3 Systematic benchmark results . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 43
+6.4 Failure modes . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 45
+6.4.1 Instability near the goal . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 46
+6.4.2 Stall / regression . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 47
+6.5 Lateral centering contribution . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 48
+6.6 Robustness to perception . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 50
+6.6.1 Occlusion and frozen camera . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 50
+6.6.2 Trajectory analysis . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 51
+6.6.3 Limits . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 52
+6.6.4 Summary . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 53
+3
+=== PAGE 5 ===
+7 Conclusion 54
+7.1 Summary . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 54
+7.2 Main findings . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 54
+7.3 Contributions . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 55
+7.4 Limitations . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 55
+7.5 Future work . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 56
+A Complete benchmark results 57
+4
+=== PAGE 6 ===
+List of Figures
+2.1 Franka Emika Panda seven-axis robotic arm [2]. . . . . . . . . . . . . . . . . . . . . . . . . . . . . 13
+3.1 Prehensile manipulation (grasping) [3] . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 15
+3.2 Non-prehensile pushing [19] . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 18
+4.1 Contact geometry and force decomposition for the general system model. A convex object
+with body frame {O} at its center of mass is pushed by a spherical end-effector at a single
+contact pointC(s), parametrised by the boundary variables(Eq. (4.3)). The contact force
+decomposes into a normal componentf n and a tangential componentf t , constrained within
+a friction cone of half-angleβ=arctan(µ p) (Eq. (4.20)). The vectorr c(s) locates the contact
+relative to the center of mass and feeds directly into the grasp-matrix relation of Eq. (4.4);θo is
+the object’ s orientation relative to the world frame. . . . . . . . . . . . . . . . . . . . . . . . . . . 22
+4.2 Side view of the pushing interaction for the cube. The contact pointc, at heightr c above
+the table, receives the raw contact forcef, decomposed into a normal componentf n and a
+tangential componentf t ; the resulting torque about the center of mass isτ o. . . . . . . . . . . 23
+4.3 Top view of the pushing interaction for the cube. The active face (red) is chosen once, at plan-
+ning time, and its contact pointCcan sit anywhere within it, offset from the face center by
+p y (Eq. (4.5)). This lateral offset is what breaks the cylinder’ s exact zero-torque property (Sec-
+tion 4.1.5): heref n no longer passes through the center of mass unlessp y =0. . . . . . . . . . . 23
+4.4 Side view of the pushing interaction for the cylinder, drawn on the same layout as Fig. 4.2 for
+direct comparison. Unlike the cube, no separate raw force vectorfis shown decomposed
+away fromf n/f t : because the contact point is fixed atr c =(R, 0) (Eq. (4.10)),f n passes through
+the center of mass and contributes no torque; onlyf t does, perτ o =R f t (Eq. (4.11)). . . . . . . 25
+5
+=== PAGE 7 ===
+4.5 Top view of the pushing interaction for the cylinder. Because the boundary is equidistant from
+the center in every direction, the contact pointCalways lies at radiusRfrom the center of mass
+(Eq. (4.10)), with no equivalent of the cube’ s lateral offsetp y . The faint markers indicate that,
+unlike the cube’ s frozen face axis, the active contact direction is re-evaluated at every control
+tick. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 25
+5.1 The three-waypoint approach trajectory. The end-effector first rises above the object at the
+hover pointH(waypoint 1, safety height), descends at that same (x,y) to pushing height (way-
+point 2), then moves in laterally to the contact pointCon the object’ s boundary (waypoint 3).
+Reaching waypoint 3 hands control to the reactive push controller of Section 5.2, which then
+drives the object along push_dir towardG. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 30
+5.2 Overall control architecture and FSM-based selection between the position and reactive push-
+ing controllers. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 31
+5.3 Velocity-impedance inner loop used by the Controller and Robot blocks of Figure 5.2. . . . . . 32
+5.4 Geometry underlying the force-corrected pushing direction of Eq. (5.6), adapted from Heins
+et al. [19]. The desired direction is expressed through the local frame ( ˆtd , ˆnd ) attached to the
+current target pointp ⋆
+d on the planned pathp d (s);θ p is the angle of the commanded pushing
+velocityv p relative to ˆtd ,θ f the angle of the measured contact forcefrelative to the same
+reference, and∆ c the lateral offset of the contact pointcfrom the path, the same quantity as
+δc, expressed here in the path-relative frame rather than the world frame. Becauseθd fixes the
+orientation of (ˆtd , ˆnd ) in the world frame, the two formulations are equivalent. . . . . . . . . . 33
+6.1 Drake simulation scenes for the two object geometries evaluated in the benchmark. . . . . . . 41
+6.2 Contact force and object velocity versus time since first contact for the cylinder atµ=0.3 and
+three object masses. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 43
+6.3 Representative cylinder trajectories at position B for a light, low-friction object and a heavy,
+high-friction object. The nominal case reaches the acceptance region, whereas the heavy-
+object run follows a more curved path and stops substantially farther from the target. Because
+both mass and friction change between panels, this figure provides a qualitative contrast be-
+tween nominal and demanding conditions. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 45
+6.4 Representative trajectory of the 2.0 kg cylinder atµ=0.3. The trajectory approaches the accep-
+tance region but terminates just outside the 25 mm success threshold, as reported in Table 6.2. 45
+6.5 Effect of friction on the cube trajectory for the same mass and initial geometry (0.5 kg, position
+A):µ=0.3 (left) andµ=0.7 (right). Higher friction produces greater curvature and slower
+convergence toward the acceptance region. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 47
+6
+=== PAGE 8 ===
+6.6 Cube push at position B (∼11 ◦ obliquity), withm=0.5 kg andµ=0.3. Compared with the
+position A case in Figure 6.5a, the lower-obliquity trajectory requires less correction before
+approaching the target. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 47
+6.7 Divergent trajectory of the 0.5 kg cube withµ=0.7 at position A when the stall/regression
+safety-net is disabled. The object first approaches and passes around the target neighbour-
+hood, then moves progressively farther away because renewed growth of the goal distance is
+interpreted by the speed profile as a reason to accelerate. . . . . . . . . . . . . . . . . . . . . . . 48
+6.8 Cube trajectories for the high-obliquity ablation case (0.25 kg,µ=0.3, position D of Table 6.1):
+full controller (left) and lateral centering disabled (right). Removing lateral centering causes
+the trajectory to diverge from the goal. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 50
+6.9 Effect of 50 % frame loss on a nominal configuration (cylinder, 1.0 kg,µ=0.3, position B). The
+pushed trajectory follows the same path in both cases; averaged over the eight configurations,
+the mean lateral deviation is 15.8 mm with and without occlusion. Only the stopping point
+differs: the occluded run terminates 2.1 mm outside the acceptance radius because the ter-
+mination test is evaluated on the perceived position, shown in purple, which carries a mean
+error of 4.0 mm. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 51
+6.10 Shape asymmetry under 90 % frame loss at high obliquity (1.0 kg,µ=0.3, position A). The
+cylinder reaches the acceptance region, while the cube diverges to 248 mm. The continuously
+re-evaluated contact normal of Section 4.1.5 keeps the cylinder’ s push direction aligned with
+the goal whatever the obliquity, whereas the cube’ s frozen face axis offers no mechanism to
+recover once the early drift has gone uncorrected. . . . . . . . . . . . . . . . . . . . . . . . . . . . 52
+7
+=== PAGE 9 ===
+List of T ables
+3.1 Summary of the main approaches for planar non-prehensile pushing. . . . . . . . . . . . . . . 19
+4.1 Contact geometry and force/torque model, cube versus cylinder. . . . . . . . . . . . . . . . . . 26
+5.1 Numerical parameter values used by the controller and perception model. . . . . . . . . . . . . 39
+6.1 Initial-position / goal pairs used in the benchmark and ablation studies. Positions A and B
+define the benchmark grid; positions C and D are used for the controller-component ablation. 40
+6.2 Benchmark results over the full grid: success rate and mean final distance to the goal, per
+shape, object-side friction, and mass. Each cell aggregates the two initial positions A and B of
+Table 6.1. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 44
+6.3 Effect of initial obliquity, averaged over all masses and friction coefficients. Position A requires
+a push direction∼27 ◦ from the nearest cube face axis, position B only∼11 ◦. . . . . . . . . . . . 44
+6.4 Controller-component ablation: final distance to the goal [mm] for a 0.25 kg object atµ=0.3,
+reported separately for positions C and D of Table 6.1. Values at or below the 25 mm threshold
+correspond to successful runs. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 49
+6.5 Effect of degraded perception on the eight configurations common to all campaigns (cube
+and cylinder, 0.5 and 1.0 kg,µ=0.3, positions A and B). Perception error is the mean distance
+between the perceived and the true object position over the push. Mean and median final
+distance diverge at 90 % occlusion because two high obliquity cube runs dominate the mean. 53
+A.1 Complete benchmark: all 48 individual runs, using the ground-truth (Drake) object position. . 57
+8
+=== PAGE 10 ===
+List of abbreviations
+Abbreviation Meaning
+DoF Degrees of freedom
+FSM Finite-state machine
+ICP Iterative closest point
+MPC Model predictive control
+PD Proportional–derivative
+RGB Red, green, and blue
+RGB-D Red, green, blue, and depth
+9
+=== PAGE 11 ===
+1
+Introduction
+This chapter introduces the motivation behind this thesis and a guideline.
+1.1 Motivation
+Robotic manipulation systems have achieved significant advances in recent years, driven by progress in
+sensing, planning, and machine learning, with the demand across various industries increasing, as their
+efficiency and speed in accomplishing tasks are undeniable. Robots are useful to accomplish complex or
+repeatable tasks by grasping or even pushing the objects.
+Despite significant progress in robotic manipulation, enabling robots to autonomously interact with
+objects in unstructured environments remains a challenging problem. Non-prehensile manipulation tasks,
+such as object pushing, require a continuous understanding of the object state and a tight integration be-
+tween perception, planning, and control. While sensors or camera provide information about the environ-
+ment, they are inherently noisy and subject to occlusions, making the state estimation difficult. At the same
+time, physical interaction with objects such as friction can not be neglected and introduces uncertainties
+that complicate both planning and control of the robot.
+Pushing non-prehensile objects in a controlled and autonomous manner is nevertheless a fundamental
+skill for robotic systems operating in real world scenarios, such as domestic assistance, industrial manip-
+ulation, or logistics. This thesis is motivated by the need to develop integrated robotic systems that can
+perceive their environment, reason about manipulation tasks, and execute contact-rich actions robustly.
+By focusing on object pushing as a representative manipulation problem, the motivation of this thesis is
+to contribute and improve toward more autonomous and adaptable robotic non-prehensile manipulation
+capabilities .
+10
+=== PAGE 12 ===
+1.2 Thesis outline
+This thesis is organised as follows.
+Chapter 2 states the problem addressed and the specific objectives pursued.
+Chapter 3 reviews the literature relevant to non-prehensile manipulation, the mechanics of planar pushing,
+planning and control strategies, force-feedback and compliant control, and perception for manipulation.
+Chapter 4 develops the theoretical background: the dynamics of the robot and of the pushed object, the
+grasp matrix relating contact force to object motion, and the contact model relating the measured contact
+force to the object’ s planar motion
+Chapter 5 presents the proposed control architecture, including the finite-state controller, the impedance-
+based push law, the camera perception model, and the dead-reckoning and stall/regression safety mecha-
+nisms.
+Chapter 6 validates the approach in the Drake simulation environment [1], reporting benchmark results
+across object shape, mass, friction, and initial obliquity, an ablation study isolating the contribution of each
+controller component, and a robustness evaluation under simulated camera noise and occlusion.
+Chapter 7 concludes the thesis, summarising its contributions, limitations, and directions for future work.
+11
+=== PAGE 13 ===
+2
+Objectives
+This work aims to provide an efficient and robust perception and control of a robotic arm to achieve a
+continuous and stable pushing of an object, depending on the shape and properties of this object. The
+three objectives of this thesis are described below.
+Determine where in the geometry of the object to push, to achieve the desired position.The mechanics
+of planar pushing show that the motion an object undergoes is not determined by the applied force alone,
+but by where on its boundary that force is applied relative to its center of mass. A contact aligned with the
+direction of the goal drives the object mostly forward. If there is a contact offset from that direction, even
+slightly, introduces a torque and an unwanted rotation. Answering this objective means, first, choosing
+which side of the object to approach and along which direction to push, given its current pose and the
+goal, and second, keeping the effective contact point aligned with that choice throughout the push, since
+the sphere and the object both move and small misalignments accumulate rather than cancel out. This
+objective is shape-dependent: a cube offers a discrete set of flat faces to choose from, while a cylinder’ s
+circular boundary offers a continuous radial contact.
+Command the end-effector to achieve the desired velocity.Once a desired pushing direction is known, it
+has to be turned into an actual motion of the robot. This means expressing the intended push as a Carte-
+sian velocity for the end-effector, then mapping that velocity through the manipulator Jacobian into joint
+torques, so that the command is not just correct in the abstract planar model but also physically realisable
+on the Franka Panda robot shown in Figure 2.1.
+Regulate the command and confirming contact.The applied command has to be kept consistent with
+the physical reality of the interaction. Regulating the command has two components. First, the push direc-
+tion should be corrected using the measured contact force, following a reactive force-feedback law, so that
+the end-effector remains engaged with the object. Secondly, the magnitude of the commanded velocity
+should be regulated through admittance saturation as a function of the measured contact force, combined
+with a distance-dependent braking profile that reduces the commanded speed smoothly as the object ap-
+12
+=== PAGE 14 ===
+proaches the target.
+Confirming contact relies on two independent sources, both can be evaluated on the object’ s real, phys-
+ical position. The simulator’ s own contact-force computation, treated as the primary source of truth, and
+a geometric estimate derived from the measured penetration between the end-effector and the object’ s
+known surface, used as a fallback whenever the primary source is unavailable.
+Figure 2.1: Franka Emika Panda seven-axis robotic arm [2].
+13
+=== PAGE 15 ===
+3
+State of the art
+This chapter reviews the literature relevant to perceiving and controlling a robotic manipulator for the push-
+ing of objects. Robotic manipulation generally relies on three capabilities: perception, which estimates the
+state of the robot and of the objects it interacts with; planning, which decides which actions to take given
+that state and a goal; and control, which executes those actions while respecting the dynamics and con-
+straints of the system.
+3.1 Non-prehensile manipulation
+Manipulation tasks are further commonly divided into prehensile actions, where the object is constrained
+by a grasp, as shown in Figure 3.1, and non-prehensile actions, where the object is moved without ever
+being firmly held, as is the case for pushing. In contrast with classical pick-and-place operations, where
+the object remains constrained by the gripper, non-prehensile actions such as pushing allow the robot to
+influence object motion beyond the immediate grasping workspace. This makes them attractive to move
+heavy or large objects that would be hard or even impossible to grab.
+These advantages come at the cost of increased complexity. The outcome of an action depends on
+contact geometry, friction, object inertia, and the evolution of intermittent contact because the object is not
+rigidly constrained by the manipulator. As a result, perception, planning, and control are tightly coupled in
+non-prehensile manipulation.
+14
+=== PAGE 16 ===
+Figure 3.1: Prehensile manipulation (grasping) [3]
+3.2 Mechanics of planar pushing
+The mechanics of planar pushing provide the theoretical basis for much of the literature on non-prehensile
+manipulation. Pushing cannot be understood as a purely kinematic problem as the object motion depends
+on the location of contact, the direction of the applied force, and the distribution of friction at the sup-
+port surface. [4] established the importance of reasoning directly about contact mechanics when planning
+pushes.
+Lynch and Mason [5] later extended this framework to stable pushing, showing that a pusher can main-
+tain contact with a moving object under appropriate geometric and friction conditions. Their results are
+particularly interesting because they link the curvature of the object boundary at the contact point to the
+feasibility of maintaining a stable push.
+A complementary perspective was provided by [6], who introduced the limit-surface model. This model
+maps the wrench applied to an object to its resulting planar motion through the support friction law. Al-
+though exact computation of the limit surface requires assumptions on pressure distribution and mass
+properties, the framework remains central to analytic models of pushing.
+Together, these works define the core mechanical insight behind planar pushing: contact forces induce
+both translation and rotation, and small changes in contact location or friction can significantly alter the
+object trajectory.
+3.3 Planning and control for pushing
+Building on these mechanical models, several planning and control strategies have been proposed for goal-
+directed pushing.
+15
+=== PAGE 17 ===
+3.3.1 Model-based planning and optimisation
+Model-based methods explicitly encode rigid-body dynamics, friction, and contact constraints in a plan-
+ning or optimisation problem. [7] proposed a contact-implicit trajectory optimisation framework based
+on complementarity constraints, allowing the planner to reason about contact switches directly. Such ap-
+proaches are attractive because they provide a principled way to predict the effects of pushing and to en-
+force physical constraints during planning.
+Their main strength is precision: when object geometry, friction coefficients, and contact conditions
+are known, they can generate highly structured and predictable motions. Their main limitation is sensi-
+tivity to modelling error. In practice, uncertainty in friction, object mass distribution, or contact state can
+substantially degrade performance, which limits deployment in unstructured environments.
+3.3.2 Sampling-based planning
+Dogar and Srinivasa [8] formulated pushing as a motion-planning problem in the joint configuration space
+of the robot and object. Their work showed that reliable pushing requires explicit reasoning about the con-
+tact mode, including sliding, sticking, and rolling transitions. This line of work is important because it high-
+lights that pushing is not just a local controller design problem but also a global planning problem under
+hybrid contact dynamics.
+3.3.3 Predictive control
+A more reactive but still structured family of methods relies on predictive models. Hogan and Rodriguez [9]
+formulated planar pushing as a contact-implicit model predictive control problem. By replanning online
+with a linearised contact model, their method can react to disturbances and changing environmental con-
+ditions while still enforcing friction-related constraints.
+Learning-based predictive control follows a similar philosophy but replaces the analytic model with a
+learned forward model. Finn and Levine [10] illustrate this trend: the robot learns a predictive model of
+the effect of its actions from raw interaction data and then uses this model for planning. Compared with
+end-to-end policy learning, this approach retains a modular structure and is often easier to interpret, but
+its performance depends strongly on the quality of the learned dynamics model.
+3.3.4 Feedback and reactive control
+At the opposite end of the spectrum are reactive strategies that do not attempt to predict long-horizon
+object motion in detail. Lloyd and Lepora’ s tactile pushing work [11], alongside Lynch et al.’ s earlier tactile-
+feedback pushing study [12], illustrates this idea well: rather than relying on a precise contact model, the
+controller uses tactile and proprioceptive feedback to maintain stable contact during pushing.
+16
+=== PAGE 18 ===
+The main advantage of such feedback-based strategies is robustness to local uncertainties such as sur-
+face variations, object shape irregularities, and contact perturbations. Their main limitation is that they
+are primarily local: they react well to immediate contact events but generally do not optimise over long
+horizons.
+More recent work continues along both lines: UNO Push [13] combines non-parametric contact esti-
+mation with MPC, while learned-policy approaches [14, 15, 16] apply learned policies to non-prehensile
+manipulation.
+3.4 Force-feedback and compliant pushing control
+Force information is especially important in pushing because the quality of the interaction depends di-
+rectly on whether contact is maintained, lost, or driven into an unstable regime. However, many robots do
+not have dedicated wrist force/torque sensors, which has motivated both compliant control strategies and
+force-estimation methods.
+3.4.1 Impedance and admittance control
+Hogan [17] introduced impedance control as a general framework for contact-rich manipulation. Instead
+of prescribing a perfectly rigid position trajectory, the robot is assigned a desired mechanical behaviour,
+typically that of a mass, spring and damper system. In pushing, this allows the manipulator to absorb small
+positioning errors and environmental uncertainties while still maintaining effective contact.
+Villani and De Schutter [18] surveyed the broader family of force control methods and clarified the dis-
+tinction between direct force control and impedance-based interaction control. This distinction remains
+important in modern pushing systems, especially when contact stability matters as much as tracking accu-
+racy.
+3.4.2 Reactive force-feedback pushing
+The most relevant prior work to this thesis is [19], who proposed a reactive force-feedback controller for
+goal-directed planar pushing. Their method operates directly in end-effector velocity space and uses the
+measured contact force direction as a correction signal for the desired pushing direction.
+This controller is interesting because it is simple, computationally cheap, and does not require a full
+object model. At the same time, its original validation assumed a force/torque sensor on an omnidirectional
+mobile base rather than an arm-mounted spherical pusher. This assumption is precisely where the present
+thesis departs from prior work. The pusher is shown in Figure 3.2.
+17
+=== PAGE 19 ===
+Figure 3.2: Non-prehensile pushing [19]
+3.4.3 Force estimation without wrist sensors
+A contact-force measurement can be available at the end-effector, as provided by a wrist force/torque sen-
+sor like [19] or by a tactile fingertip [11].
+When direct force sensing is unavailable, contact forces may be estimated from joint torques through
+the robot dynamics [20], or inferred more indirectly from geometry and overlap [21]. The latter direction is
+particularly relevant when the end-effector geometry is simple and the contact surface is known approxi-
+mately.
+3.5 Perception for manipulation
+Reliable pushing requires knowledge of the object pose. Classical pipelines use point-cloud segmentation
+and registration; a standard reference is the ICP algorithm of Besl and McKay [22], which remains founda-
+tional for 3-D alignment.
+More recent approaches use learned object detection and pose estimation. LINEMOD [23] is a repre-
+sentative model-based method for texture-less object detection and pose estimation, while PoseCNN [24]
+illustrates learning-based RGB pose estimation. DenseFusion [25] further combines RGB and depth fea-
+tures for robust 6-DoF pose estimation in cluttered scenes. More broadly, Bohget al.[26] emphasised that
+perception and manipulation should not be treated as independent modules: action can improve percep-
+tion, and perception can guide action.
+In pushing specifically, perception quality strongly influences controller performance because small
+pose errors lead directly to contact-location errors. At the same time, visual perception degrades during
+physical interaction due to occlusions, motion blur, and manipulator-induced clutter. This makes purely
+vision-based pipelines brittle during sustained contact.
+18
+=== PAGE 20 ===
+3.6 Summary table
+Table 3.1 summarises the main approaches reviewed in this chapter, together with their main strengths,
+limitations, and relevance to the present thesis.
+Table 3.1: Summary of the main approaches for planar non-prehensile pushing.
+Approach Main idea Strengths Limitations
+Mechanical
+models
+Pushing mechanics
+and friction laws [4,
+6]
+Physical insight;
+foundation
+Model-dependent
+Model-based
+planning
+Dynamics and con-
+tact constraints
+in optimisation /
+MPC [7, 9]
+Structured plans;
+constraints
+Sensitive to uncer-
+tainty
+Sampling-based
+planning
+Search over robot–
+object contact
+modes [8]
+Good for long-
+horizon tasks
+Computational
+cost
+Reactive feed-
+back
+Local regulation
+from force / tactile
+feedback [11, 19]
+Robust; simple;
+lightweight
+Little anticipation
+Compliant con-
+trol and force es-
+timation
+Impedance/admittance
+with estimated con-
+tact forces [17, 18, 20,
+21]
+Relevant to
+contact-rich tasks
+Tuning-sensitive
+Perception Pose estimation
+from geometry or
+vision [22, 23, 24, 25,
+26]
+Essential in real
+settings
+Fragile under oc-
+clusion
+19
+=== PAGE 21 ===
+4
+System model
+This chapter develops a general mathematical model of the robot, the pushed object, and the contact that
+couples them. The goal is to obtain a representation precise enough to state clearly what is being assumed,
+what limits the system is subject to, and how a contact force turns into motion on both sides of the interac-
+tion, before specialising to the quasi-static, single-point case that the rest of this thesis relies on.
+4.1 Manipulator-object model
+Understanding how the manipulator and the pushed object influence each other requires three ingredients:
+a dynamic model for each of the two bodies taken separately, a parametrisation of how contact forces are
+transmitted between them, and a combined model obtained by coupling the two through that parametri-
+sation. This section develops each in turn.
+4.1.1 Robot model
+The Franka Panda is a serial manipulator withn=7 revolute joints, its state fully specified by the pair (q, ˙q),
+q∈R 7. Its dynamics follow the standard rigid-body form
+M(q) ¨q+C(q, ˙q) ˙q+g(q)=τ+τ ext, (4.1)
+whereM(q)∈R 7×7 is the symmetric positive-definite joint-space inertia matrix,C(q, ˙q) ˙qcollects the Cori-
+olis and centrifugal terms,g(q) is the gravity vector,τis the commanded joint torque, andτ ext is the joint
+torque induced by an external load, here the reaction force at the contact between the end-effector and the
+object.
+4.1.2 Object model
+To obtain the object dynamic model, we can consider a system consisting of a single point contact between
+the end-effector and the object. Modelling the object requires stating assumptions in order to have a sim-
+plified system.
+20
+=== PAGE 22 ===
+1. The object is a rigid body with known dynamical properties (massmand planar moment of inertia
+Izz , or equivalently the squared radius of gyrationc 2 =I zz /m).
+2. The object rests on a flat, horizontal table and remains in contact with it throughout the task, so that
+the configuration is fully described by a planar posex o =(x o,y o,θ o)∈SE(2) rather than the full six-
+degree-of-freedom rigid-body pose.
+3. The robot interacts with the object through a single contact point, located on the object’ s boundary.
+4. Only linear, in-plane forces are transmitted through this contact point: a point-contact-with-friction
+model, following the classical Coulomb contact model. No moment is transmitted about the contact
+normal, explained by the spherical pusher against a smooth object surface.
+5. The object’ s motion is quasi-static.
+6. Coulomb friction applies at both interfaces of the problem, each governed by its own known, uniform
+coefficient:µ p between the pusher and the object, andµ table between the object and the table.
+Under Assumptions 1-2, the object’ s in-plane configuration is fully captured by the planar twistVo =( ˙xo, ˙yo, ˙θo)⊤ ∈
+R3, and its dynamics follow the planar Newton-Euler equation, the object-side analogue of Eq. (4.1),
+Mo ˙Vo +C o(Vo)V o =F o, (4.2)
+whereM o =diag(m,m,I zz ) is the constant planar mass matrix,C o(Vo) collects the terms arising from the
+rotation of the body-fixed frame relative to the world (the object-side analogue of the Coriolis termC(q,˙q) ˙q,
+here induced by the object’ s own rotation), andFo ∈R 3 is the net planar wrench applied to the object. Under
+Assumptions 3–4, this wrench reduces to the single-contact formF o =G f c already introduced in Eq. (4.4),
+giving the version used in Section 4.1.6. As noted there, Eq. (4.2) is never solved online as a genuine dynamic
+equation: under Assumption 5 (quasi-static motion), the acceleration term ˙Vo is negligible compared with
+the contact and friction forces involved, and the equation collapses to the direct algebraic relation that the
+reactive controller is built around.
+4.1.3 Contact model parametrization
+In the general case ofn c contact points, as in a multi-fingered or tray-based grasp, the net object wrench is
+obtained through a grasp matrixG∈R 6×dn c mapping the stacked contact forcesF c to the resultant wrench
+at the object’ s center of mass,Fo =GF c, with each contact’ s contribution weighted by its lever arm relative to
+the object frame. Assumption 3 restricts this thesis to the degenerate casenc =1, and Assumption 4 restricts
+the transmissible force at that single contact to a planar linear force withd=2 components,f c =(f n,f t )⊤,
+decomposed into a normal and a tangential component in the local contact frame. The contact location
+21
+=== PAGE 23 ===
+itself is parametrised, in the object’ s body frame, by a scalar boundary parameters,
+rc(s)=
+
+rx(s)
+r y (s)
+
+, (4.3)
+with the shape-specific forms ofr c(s) given in Sections 4.1.4 and 4.1.5. The grasp matrix reduces, in this
+single-contact case, to a 3×2 matrix mapping the local contact force directly to the planar object wrench,
+Fo =G f c,G=
+
+
+1 0
+0 1
+−r y (s)r x(s)
+
+
+, (4.4)
+which is exactly the wrench decompositionτ o =r x(s)f t −r y (s)f n.
+table
+object
+xo
+yo
+CoM, {O}
+rc (s)
+β
+pusher (sphere,r)
+C(s)
+fn
+ft
+Figure 4.1: Contact geometry and force decomposition for the general system model. A convex object with
+body frame {O} at its center of mass is pushed by a spherical end-effector at a single contact pointC(s),
+parametrised by the boundary variables(Eq. (4.3)). The contact force decomposes into a normal com-
+ponentf n and a tangential componentf t , constrained within a friction cone of half-angleβ=arctan(µ p)
+(Eq. (4.20)). The vectorr c(s) locates the contact relative to the center of mass and feeds directly into the
+grasp-matrix relation of Eq. (4.4);θ o is the object’ s orientation relative to the world frame.
+4.1.4 Cube: contact geometry and force/torque model
+Under the quasi-static assumption (Assumption 5, Section 4.1.2), the object’ s motion at each instant is
+treated as a succession of force balances: inertial terms are negligible next to the contact and friction forces.
+This is the model that both this section and Section 4.1.5 instantiate for a specific shape: the contact wrench
+is decomposed into a normal and a tangential component at the single contact point of Assumption 3, and
+combined with the object’ s radius of gyration to characterise how that wrench turns into translation and
+rotation.
+A cube offers a discrete set of four flat faces to push against. Unlike the cylinder (Section 4.1.5), where
+the contact point is fixed by geometry alone, a flat face leaves the contact location genuinely free within it:
+the pusher can be well-centered on the face or offset by some amountp y , and it is precisely this offset that
+22
+=== PAGE 24 ===
+turns out to be the dominant source of unwanted torque. In the implementation, the active face is chosen
+once, at planning time, and held fixed for the remainder of the push; only the object’ s own yawθo is tracked
+afterwards, through the same low-pass filter used for the desired direction (Section 5.2), so that the frozen
+face axis stays consistent with the object’ s slowly rotating body frame rather than with its planning-time
+orientation alone.
+Contact geometry:expressed in the object’ s body frame, with the localx-axis aligned with the active face’ s
+outward normal, the contact location is
+rc =
+
+ a
+p y
+
+, (4.5)
+whereais the cube’ s half-side (fixed by the object’ s geometry) andp y ∈[−a,a] is the lateral offset of the
+contact point from the face center. It is free in principle and, in practice, set by wherever the approach
+planner and the reactive controller happen to place the pusher relative to the object.
+c CoM
+x
+z rc f
+fn
+ft
+τo
+Figure 4.2: Side view of the pushing interaction for the cube. The contact pointc, at heightrc above the table,
+receives the raw contact forcef, decomposed into a normal componentf n and a tangential componentf t ;
+the resulting torque about the center of mass isτ o.
+cube (half-sidea)
+CoM
+a
+Cp y
+pusher
+fn
+ft
+τo = −p y fn
+face frozen at planning time, cf. §5.2
+x
+y
+Figure 4.3: Top view of the pushing interaction for the cube. The active face (red) is chosen once, at plan-
+ning time, and its contact pointCcan sit anywhere within it, offset from the face center byp y (Eq. (4.5)).
+This lateral offset is what breaks the cylinder’ s exact zero-torque property (Section 4.1.5): heref n no longer
+passes through the center of mass unlessp y =0.
+Force and torque decomposition:substituting the contact location of Eq. (4.5) into the general torque
+relationτ o =r x ft −r y fn of Eq. (4.4) gives, in general,
+τo =a f t −p y fn. (4.6)
+23
+=== PAGE 25 ===
+For a face-aligned push, the pusher moves predominantly along the face normal, so the tangential term
+stays small relative to the off-center normal-force term whenever the contact is reasonably close to cen-
+tered; the implementation retains only the dominant term,
+τo ≈ −p y fn, (4.7)
+as explained by in Table 4.1. This is a modelling simplification, not an exact identity, unlike the cylinder,
+whereτ o =R f t (Eq. (4.11)) holds exactly by construction becausef n always passes through the center. For
+the cube, Eq. (4.7) is only as good as the assumption thatp y stays small and that sliding along the face is
+limited; a large offset or a slipping contact would reintroduce thea f t term.
+Radius of gyration:for a cube of massm, half-sidea(so a square footprint of side 2a), heighth, and
+uniform densityρ=m/(4a 2h), the planar moment of inertia about the vertical axis through the center of
+mass is
+Izz =
+ˆ h
+0
+ˆ a
+−a
+ˆ a
+−a
+ρ(x 2 +y 2)d x d y d z=ρh
+· 2a3
+3 ·2a+ 2a3
+3 ·2a
+¸
+=ρh· 8a4
+3 = 2
+3 ma 2, (4.8)
+c2 = Izz
+m = 2
+3 a2. (4.9)
+As for the cylinder (Eq. (4.13)), this closed-form value does not depend on the object’ s height, and is com-
+puted at initialisation and logged for diagnostics, it does not feed any closed-loop term, the controller reg-
+ulates the contact through the lateral centering and braking terms of Section 5.2 instead. A smalleraat
+constant mass gives a smallerc 2 and hence less rotational inertia to resist the torque of Eq. (4.7).
+The full side-by-side comparison with the cylinder, including this result, is collected in Table 4.1 at the
+end of Section 4.1.5.
+4.1.5 Cylinder: contact geometry and force/torque model
+The cube’ s flat faces leave the contact location within a face genuinely free: the pusher can be well-centered
+or offset by some amountp y , and that offset is precisely what Section 4.1.4 identifies as the source of un-
+wanted torque. A cylinder of radiusRremoves this degree of freedom entirely. Because its boundary is
+equidistant from the center in every direction, the point where a spherical pusher touches the cylinder is
+fixed by geometry alone: it lies on the line joining the sphere center to the cylinder axis, projected onto the
+table plane. There is no equivalent, for the cylinder, of choosing to push slightly off-center on a face; every
+contact point is already exactly at radiusRfrom the object’ s center.
+24
+=== PAGE 26 ===
+Contact geometry:expressed in the object’ s body frame, with the localx-axis aligned with the current
+contact normal ˆnface, this fixes the contact location at
+rc =
+
+R
+0
+
+. (4.10)
+c CoM
+x
+z rc
+fn
+ft
+Figure 4.4: Side view of the pushing interaction for the cylinder, drawn on the same layout as Fig. 4.2 for
+direct comparison. Unlike the cube, no separate raw force vectorfis shown decomposed away fromf n/f t :
+because the contact point is fixed atr c =(R,0) (Eq. (4.10)),f n passes through the center of mass and con-
+tributes no torque; onlyf t does, perτ o =R f t (Eq. (4.11)).
+cylinder (radiusR)
+CoM
+R C
+pusher
+fn
+ft
+τo =R f t
+x
+y
+Figure 4.5: Top view of the pushing interaction for the cylinder. Because the boundary is equidistant from
+the center in every direction, the contact pointCalways lies at radiusRfrom the center of mass (Eq. (4.10)),
+with no equivalent of the cube’ s lateral offsetp y . The faint markers indicate that, unlike the cube’ s frozen
+face axis, the active contact direction is re-evaluated at every control tick.
+Force and torque decomposition:as for any convex primitive under the quasi-static model of Section 4.1.4,
+the contact wrench decomposes into a normal componentf n, directed along the inward radial direction,
+and a tangential componentf t , orthogonal to it in the table plane. Substituting the contact location of
+Eq. (4.10) into the general torque relationτ o =r x ft −r y fn gives
+τo =R f t . (4.11)
+This result is qualitatively different from the cube. Because the normal force always passes through
+the object’ s center by construction,f n contributes no torque at all here, and the entire rotational effect of
+the push is carried by the tangential, frictional force component. For the cube, by contrast, the dominant
+source of unwanted torque is exactly the opposite: a normal force applied off-center on an otherwise flat
+face,τ o = −p y fn (Section 4.1.4). The two shapes therefore fail differently under the same controller, which
+25
+=== PAGE 27 ===
+is consistent with what was observed during the benchmark campaign: the cube tends to accumulate a
+slow rotational drift even under low friction, since it only takes a small, purely normal offset to start it turn-
+ing, whereas a cylinder only starts rotating once the tangential component becomes significant, which is
+a narrower and more abrupt regime; closer to the near-instantaneous directional flick than to a gradual
+drift. This is offered here as a plausible mechanical explanation rather than a fully isolated cause, since the
+benchmark data also show other contributing factors.
+Radius of gyration:the quasi-static pushing model requires the object’ s squared radius of gyrationc 2 =
+Izz /m, whereI zz is the moment of inertia about the vertical axis through the center of mass. For a solid
+cylinder of massm, radiusR, heighth, and uniform densityρ=m/(πR 2h),
+Izz =
+ˆ h
+0
+ˆ 2π
+0
+ˆ R
+0
+ρr 2 ·r dr dθd z=ρh·2π· R4
+4 = 1
+2 mR 2, (4.12)
+c2 = Izz
+m = R2
+2 . (4.13)
+This is exact for a uniform cylinder and, notably, does not depend on the heighth: the planar pushing model
+only ever involves rotation about the vertical axis, so the radius alone sets the object’ s rotational inertia in
+the plane, unlikeI xx andI y y, which do depend onhand are only relevant to the three-dimensional rigid-
+body simulation itself rather than to the planar pushing model.
+In the current controller,c 2 is computed for both shapes at initialisation and logged for diagnostic pur-
+poses. It is the physically correct quantity from Lynch and Mason’ s limit-surface analysis [5], and Eq. (4.13)
+is the closed-form result that the shape-generalisation code relies on, but it does not currently feed into an
+active, closed-loop correction term; the controller regulates the contact through the lateral centering and
+braking terms of Section 5.2 instead.
+Summary:table 4.1 collects the two derivations side by side.
+Cube (half-sidea) Cylinder (radiusR)
+Contact locationr c (a,p y ),p y free within the face (R, 0), fixed by geometry
+Torqueτ o −p y fn R ft
+Dominant torque source normal force, off-center tangential (frictional) force
+Radius of gyrationc 2 2
+3 a2 1
+2 R2
+Table 4.1: Contact geometry and force/torque model, cube versus cylinder.
+4.1.6 Combined dynamic model
+In order to couple the two subsystems, the contact forcef c is transformed into the corresponding joint
+torque through the manipulator’ s translational Jacobian at the contact point (the sphere center, since the
+26
+=== PAGE 28 ===
+sphere’ s rigid attachment topanda_handplaces the contact directly at a known offset from it),
+τext =J v (q) ⊤ fc,world, (4.14)
+wheref c,world is the contact force expressed in world coordinates. Substituting Eq. (4.14) into Eq. (4.1), and
+Eq. (4.4) into Eq. (4.2), gives the coupled system
+M(q) ¨q+C(q, ˙q) ˙q+g(q)=τ+J v (q) ⊤ fc,world, (4.15)
+Mo ˙Vo +C o(Vo)V o =G f c. (4.16)
+Equations (4.15)-(4.16) are the general foundation of the system: they hold regardless of howfc is generated.
+They are not solved online as such; under the quasi-static assumption (Assumption 5), Eq. (4.16) collapses
+to the direct kinematic relation already noted in Section 4.1.2, and it is this simplified relation, not the full
+dynamic equation, that the reactive controller is built around. Equation (4.15), by contrast, is used as stated:
+it is exactly the relation that maps the commanded velocity to a joint torque through the impedance law of
+Eq. (5.4).
+4.2 Manipulator-object constraints
+The combined model of Section 4.1 is only physically meaningful within the limits of what the robot can ac-
+tually do and what the contact can actually sustain. These two families of constraints are treated separately
+below.
+4.2.1 Robot constraints
+The Franka Panda is subject to three standard types of constraint.
+Actuator saturation.Each joint torque is bounded by the motor’ s physical limits,
+−τmax,i ≤τ i ≤τ max,i ,i=1, .. ., 7, (4.17)
+whereτ max,i is the torque limit of jointi(Table 5.1).
+Operating range.Each joint angle is bounded by the manipulator’ s mechanical limits,
+qmin,i ≤q i ≤q max,i ,i=1, .. ., 7, (4.18)
+whereq min,i andq max,i are the manufacturer-specified joint limits.
+27
+=== PAGE 29 ===
+Speed limitations.Each joint velocity is similarly bounded,
+˙qmin,i ≤ ˙qi ≤ ˙qmax,i ,i=1, .. ., 7. (4.19)
+where ˙qmin,i and ˙qmax,i are the joint velocity limits.
+4.2.2 Contact and friction constraints
+Two friction interfaces are relevant here, and they play structurally different roles, unlike a grasp-based
+system where a single non-sliding condition must hold at every contact.
+Pusher-object contact.The tangential force cannot exceed the local friction cone,
+|f t | ≤µ p fn,f n ≥0, (4.20)
+whereµ p is the friction coefficient of the object. Non-penetration between the sphere and the object is en-
+forced by the simulator’ s compliant Hunt-Crossley contact model rather than by an exact rigid-body com-
+plementarity condition (δ≥0,f n ≥0,δ·f n =0 in the ideal rigid limit).
+Object-table interface.Unlike the pusher-object contact, sliding at this interface is not something to be
+prevented: it is the mechanism by which pushing works at all. What matters instead is that the combined
+friction coefficient,
+µc =
+2µ ′
+p µtable
+µ′
+p +µ table
+, (4.21)
+(the harmonic mean Drake uses to combine two surfaces’ friction coefficients) matches the object’ s ob-
+served steady-state sliding behaviour.
+Unlike a grasp-based system model, where the contact forces are decision variables of an online opti-
+misation and must therefore be explicitly parametrised as a linear combination of polyhedral friction-cone
+edges to keep that optimisation convex, the controller of this thesis does not solve forf c at all: it is mea-
+sured or estimated (Section 5.2.3), and the friction cone of Eq. (4.20) is used as an analysis and validation
+constraint.
+28
+=== PAGE 30 ===
+5
+Controller design
+5.1 Approach and repositioning planner
+Before the controller can regulate contact, the end-effector first has to reach the object without colliding
+with it. This is handled by a fixed-structure planner: given the object’ s position and the goal, it produces a
+short sequence of Cartesian waypoints that the existing position controller tracks open-loop, and it hands
+the controller the push direction, the planned push distance, and the geometric contact normal. With these
+informations the controller can start pushing the object.
+Approach geometry.LetO∈R 2 be the planar object position andG∈R 2 the planar goal position. The unit
+push direction is
+ddi r= G−O
+∥G−O∥ , (5.1)
+where ddi ris the normalised vector from the object to the goal and∥·∥is the Euclidean norm. The approach
+side is the opposite one: the unit contact normalnpoints from the object centre toward the side approached
+by the pusher, so that pushing along−ndrives the object towardG. For the cylinder,n= − ddi r. For the cube,
+nis the nearest face normal, accounting for the current object orientation. The contact pointCis the point
+where the sphere touches the object, while the hover pointHis a collision-free point farther alongn.
+Waypoint sequence.The approaching state tracks exactly three waypoints, listed in Figure 5.1: a safety-
+height point aboveH, a descent to pushing height still atH, and a final lateral move toC. This vertical
+then lateral structure keeps the sphere from clipping the object’ s top edge while descending, at the cost of
+assuming the space directly aboveHis itself free, which holds in the tabletop scenes considered here but
+would need revisiting for cluttered scenes.
+In case the contact is lost during the push phase, the same construction is reused for the reposition state,
+extended with two additional waypoints at the front: the sphere’ s current position (held at safety height) and
+a retreat point alongn, offset far enough from the object to clear it before re-approaching through the same
+hover-then-contact sequence as above. Bothnand the push direction are recomputed from the object’ s
+29
+=== PAGE 31 ===
+object
+O
+goalG
+push_dir
+n
+C
+H
+1
+2
+3
+1(H x y,z=APPROACH_Z)
+2(H x y,z=Z_PUSH)
+3(C x y,z=Z_PUSH)
+APPROACH state: 1→2→3; on reaching
+point 3 (C), the FSM switches to PUSH
+and follows push_dir (Section 5.2).
+Figure 5.1: The three-waypoint approach trajectory. The end-effector first rises above the object at the hover
+pointH(waypoint 1, safety height), descends at that same (x,y) to pushing height (waypoint 2), then moves
+in laterally to the contact pointCon the object’ s boundary (waypoint 3). Reaching waypoint 3 hands control
+to the reactive push controller of Section 5.2, which then drives the object along push_dir towardG.
+position at the moment of repositioning rather than reused from the original plan, which is also what the
+dead-reckoning distance of Eq. (5.17) needs to be refreshed to stay valid after a reposition (Section 5.3).
+Waypoint tracking.Each waypointw k is tracked by a dedicated position controller, active throughout the
+approach phase, which implements the Cartesian PD law:
+Fpos =K p,pos
+¡
+wk −p s
+¢
+−K d,pos ˙ps +F floor, (5.2)
+whereF pos is the Cartesian force command,K p,pos andK d,pos are respectively the position and damping
+gains,w k is the current Cartesian waypoint,p s and ˙ps are the sphere position and velocity, andF floor is
+the vertical floor-compensation force. The force is mapped to joint torque throughτ=J v (q) ⊤Fpos −g(q),
+whereτis the commanded joint-torque vector,J v (q) is the translational Jacobian at joint configurationq,
+andg(q) is the gravity-torque vector.
+5.2 Push controller
+Figure 5.2 summarises the information flow through the complete system.x o(t0) is the true object pose at
+the initial capture timet 0, where the subscriptorefers to the object. The Camera block applies the measure-
+ment model of Eq. (5.18) and returns ˆxo, the estimated object pose; throughout the diagram, a hat indicates
+an estimated or filtered quantity. From this estimate, the Planner computesw k, the Cartesian waypoint
+with indexk, and ˆd, the filtered unit direction from the object towardt, wheretis the target goal position
+to be reached.
+Sdenotes the selector controlled by the finite-state machine (FSM). The selector is driven by the finite-
+state machine of Section 5.1, whose transitions depend on the waypoint error, the confirmed contact status,
+30
+=== PAGE 32 ===
+Camera Planner
+Position
+controller
+Reactive push
+controller
+S Robot Object
+FSM state
+t
+ˆxo
+wk
+ˆd,t
+Fpos
+vcmd
+push
+xo(t0)
+ˆfc ,θo
+q, ˙q
+q, ˙q
+Figure 5.2: Overall control architecture and FSM-based selection between the position and reactive pushing
+controllers.
+and the distance to the goal. During the approach and repositioning states,Sselects the position controller,
+which combines the waypointw k with the robot joint positionqand joint velocity ˙qto generate the Carte-
+sian force commandF pos. This branch implements the Cartesian PD law of Eq. (5.2); it simply drives the
+spherical end-effector toward a fixed waypoint before sustained contact begins.
+Once the last waypoint is reached, the FSM enters the pushing state andSselects the Reactive push
+controller. This branch combines the desired direction ˆd, the estimated contact-force vector ˆfc, the object
+yaw angleθ o, and the joint state (q, ˙q) to producev cmd ∈R 3, the commanded Cartesian velocity of the
+spherical end-effector. For the cube,θ o is used to rotate the frozen face axis from the object frame into
+the world frame, so that the controller retains the selected physical face while accounting for the object’ s
+rotation during the push. The Robot block executes the selected command and mechanically pushes the
+Object block. The resulting interaction provides the contact-force feedback ˆfc, independently of the camera
+measurement. The commanded velocity is tracked through the velocity-impedance law of Eq. (5.4), detailed
+in Figure 5.3.
+˙ps =J v (q) ˙q, (5.3)
+where ˙qis the joint-velocity vector and ˙ps is the corresponding Cartesian velocity of the sphere. This velocity
+feeds the velocity-impedance law
+Ftrans =K v
+¡
+vcmd − ˙ps
+¢
++F floor, (5.4)
+whereF trans is the virtual Cartesian force,K v is the velocity-impedance gain, andv cmd is the desired Carte-
+sian sphere velocity. The resulting force is mapped to joint torque throughτ=J v (q) ⊤Ftrans −g(q) and sat-
+urated at the Franka Panda torque limits. Commanding torque throughJ ⊤
+v rather than commanding joint
+velocity throughJ −1
+v keeps the end-effector compliant against an object whose exact position is not known
+in real time.
+31
+=== PAGE 33 ===
+Σ Kv Σ J ⊤v Robot
+Jv (q)
+vcmd
++
+−
+ev +
++
+Ftrans τ
+−g(q)
+Ffloor
+q, ˙q
+˙ps
+Figure 5.3: Velocity-impedance inner loop used by the Controller and Robot blocks of Figure 5.2.
+Figure 5.3 details how the Cartesian command is converted into joint torques. The desired velocity
+vcmd is compared with the measured sphere velocity ˙ps =J v (q) ˙q, whereJ v (q) is the translational Jacobian
+evaluated at the joint configurationqand ˙qis the joint-velocity vector. Their difference is the velocity error
+ev , which the impedance gainK v converts into a virtual corrective force. Adding the floor-compensation
+termF floor gives the total translational wrenchF trans, which is mapped to the commanded joint torque by
+J ⊤
+v ; gravity compensationg(q) is then subtracted, yieldingτ=J ⊤
+v Ftrans −g(q). The loop therefore uses the
+forward Jacobian to obtain Cartesian velocity and its transpose to map force into torque, without requiring
+an inverse or pseudo-inverse ofJ v .
+5.2.1 Direction filtering
+At every tick the desired direction is recomputed from the (possibly perceived) object position, ˆdraw =(g−
+ˆp)/∥g− ˆp∥. Because ˆdcan reverse by more than 140 ◦ within about a second if the object slightly overshoots
+the goal, a behaviour observed empirically and referred to throughout this chapter as theflick, it is not used
+directly but low-pass filtered first,
+ˆdfilt ←
+D ˆd
+ˆdraw +(1−D ˆd ) ˆdfilt
+∥D ˆd
+ˆdraw +(1−D ˆd ) ˆdfilt∥
+, (5.5)
+where ˆdraw is the instantaneous unit direction from the perceived object position ˆpto the goalg, ˆdfilt is its
+filtered and renormalised value, andD ˆd is the direction-filter coefficient. The assignment arrow denotes
+an update at each control tick. The filtered direction definesθ d =atan2( ˆdy , ˆdx), the desired heading, and
+ˆnd =[− ˆdy , ˆdx]⊤, the unit direction perpendicular to the push.
+When contact is detected, the direction is corrected by the force-feedback law of Heins et al. [19],
+θp =θ d +(K F +1)δ f +K C δc, (5.6)
+whereθ p is the commanded pushing heading,θ d is the goal-directed heading,K F is the force-direction
+gain,K C is the lateral-offset gain,δ f is the wrapped angular error between the force and desired directions,
+andδ c is the signed lateral contact offset. More precisely,θ f =atan2(f k,y ,f k,x ) is the direction of the filtered
+forcef k,δ f =wrap(θ f −θ d ), andδ c = ˆn⊤
+d (p x y
+s − ˆp), wherep x y
+s is the planar sphere position. When contact
+32
+=== PAGE 34 ===
+is not detected,θ p =θ d . The scheme of this contact detection can be observed in Fig. 5.4
+Figure 5.4: Geometry underlying the force-corrected pushing direction of Eq. (5.6), adapted from Heins et
+al. [19]. The desired direction is expressed through the local frame ( ˆtd , ˆnd ) attached to the current target
+pointp ⋆
+d on the planned pathp d (s);θ p is the angle of the commanded pushing velocityv p relative to ˆtd ,
+θf the angle of the measured contact forcefrelative to the same reference, and∆ c the lateral offset of the
+contact pointcfrom the path, the same quantity asδ c, expressed here in the path-relative frame rather than
+the world frame. Becauseθ d fixes the orientation of ( ˆtd , ˆnd ) in the world frame, the two formulations are
+equivalent.
+5.2.2 Shape-dependent contact normal
+The active contact normal ˆnface is handled differently for the two shapes.
+Cylinder .The contact normal is re-derived every tick directly from the filtered direction, ˆnface = − ˆdfilt –
+safe because ˆdfilt is already stabilised by Eq. (5.5).
+Cube.The active face axis is instead locked at planning time, when the approach phase begins, and is
+never reselected from ˆdduring the push. Recomputing it at every tick, as for the cylinder, was tested and
+subsequently abandoned: if the object overshoots the goal and ˆdreverses, the controller may switch to
+the opposite face even though the object has not actually rotated. This spurious face switch caused jumps
+of several centimetres near the end of multiple pushes. Instead, only the object’ s own yawθ o, measured
+relative to its value at the planning instant, is allowed to rotate the frozen axis, andθ o itself is filtered first,
+ˆnface =R(θ o,filt −θ o,ref) ˆn 0
+face,θ o,filt ←lowpass(θ o,Θ o), (5.7)
+where ˆnface is the current cube-face normal,R(·) is the planar rotation matrix,θ o,filt is the filtered object yaw,
+θo,ref is the yaw recorded when the push was planned, and ˆn 0
+face is the face normal selected at that instant.
+The measured yaw isθ o, lowpass(·) denotes the yaw-filter update, andΘ o is its filter coefficient.
+5.2.3 Contact estimation and confirmation
+Contact force is estimated from two sources. When Drake’ s own contact solver reports contact between the
+sphere and the object, the corresponding reaction force is used directly. Otherwise, a geometric fallback
+33
+=== PAGE 35 ===
+estimates the force from the penetrationδbetween the sphere and the active face along ˆnface,
+fraw =K c δ(− ˆnface), (5.8)
+wheref raw is the unfiltered planar force estimate,K c is the geometric contact stiffness,δis the penetration
+depth, and− ˆnface is the estimated reaction-force direction. The fallback is gated behind an independent
+geometric proximity test. Either force source is then low-pass filtered,
+fk =β f fraw +(1−β f )f k−1. (5.9)
+Here,f k is the filtered force at control tickk,f k−1 is the previous filtered force, andβ f is the force-filter
+coefficient.
+Contact is confirmed when any of three independent signals is positive: Drake reports it directly, the
+geometric proximity test is satisfied, or the filtered force magnitude exceedsF min, the minimum force-
+detection threshold.
+5.2.4 Lateral centering
+A lateral centering velocity continuously drives the end-effector center to align with the object center in the
+direction perpendicular to the push,
+vlat =K lat εlat ˆnd ,ε lat = ˆn⊤
+d ( ˆp−p x y
+s ). (5.10)
+wherev lat is the lateral correction velocity,K lat is the lateral-centering gain,ε lat is the signed lateral position
+error, ˆnd is the unit direction perpendicular to the push, ˆpis the perceived object position, andp x y
+s is the
+planar sphere position.
+5.2.5 Braking profile and velocity decomposition
+The forward push speed decelerates as the object approaches the goal:
+frac=clip
+µ d−d done
+dbrake −d done
+, 0, 1
+¶
+, (5.11)
+vprofile =max
+³
+Vpush
+p
+frac,V creep
+´
+, (5.12)
+whered= ∥ ˆp−g∥is the perceived distance to the goal,d done is the completion threshold,d brake is the dis-
+tance at which braking begins, frac is the normalised braking fraction bounded to [0, 1],Vpush is the nominal
+push speed,V creep is the minimum speed retained near the goal, andv profile is the resulting forward-speed
+command. The operator clip bounds its first argument between the stated lower and upper limits. The
+commanded horizontal velocity then combines this profile with the force-corrected direction and the lat-
+34
+=== PAGE 36 ===
+eral centering term,
+vx y =v profile
+
+cosθ p
+sinθ p
+
+ +K lat εlat ˆnd . (5.13)
+wherev x y is the commanded planar velocity and (cosθp,sinθ p)⊤ is the unit vector associated with the com-
+manded headingθ p. A second correction damps only the object’ sexcessvelocity along the push direction,
+relative to what the profile currently allows, and leaves its legitimate velocity untouched,
+vx y ←v x y −V damp max(0,v ∥
+obj −v profile)
+
+cosθ p
+sinθ p
+
+, (5.14)
+whereV damp is the excess-velocity damping gain andv ∥
+obj is the object’ s filtered velocity projected onto the
+push direction. The max term is nonzero only when the object moves faster than the active speed profile.
+Finally, an admittance saturation limits the commanded velocity when the measured force exceedsF max,
+vx y ←v x y
+Fmax
+∥f k ∥ if∥f k ∥ >F max, (5.15)
+whereF max is the force threshold for velocity scaling and∥f k ∥is the magnitude of the filtered contact force.
+The ratio preserves the velocity direction while reducing its magnitude. A force-independent hard cap is
+subsequently applied atγ vVpush, whereγ v is the velocity-cap multiplier.
+5.2.6 Vertical regulation
+The vertical component keeps the sphere at the pushing heightz push,
+vz =clip
+¡
+Kz,p (zpush −p s,z )−K z,d ˙ps,z ,−V z,max,V z,max
+¢
+, (5.16)
+wherev z is the commanded vertical velocity,K z,p andK z,d are the vertical position and damping gains,
+zpush is the desired pushing height,p s,z and ˙ps,z are the sphere’ s vertical position and velocity, andVz,max is
+the maximum vertical speed magnitude.
+5.2.7 Termination and loss of contact
+The pushing state ends through one of two criteria. The first one compares the perceived distance to the
+goal against the thresholdd done, so thatd<d done. The second is a dead-reckoning criterion based on the
+sphere’ s own displacement since the start of the push, along the direction planned at that time,
+sphere_progress=(p x y
+s −p x y
+s,start)⊤ ˆdplan ≥ ∥g− ˆpplan∥, (5.17)
+35
+=== PAGE 37 ===
+where sphere_progress is the sphere displacement projected along the planned push direction,p x y
+s is the
+current planar sphere position,p x y
+s,start is its position at push onset, ˆdplan is the unit direction stored by the
+planner,gis the goal position, and ˆpplan is the perceived object position used to create the plan. The right-
+hand side is therefore the planned push distance.
+If none of Drake, the geometric test, or the filtered force confirm contact for more thanT nc , the no-
+contact timeout, the controller re-plans an approach. If the object is already withinγ doneddone of the goal,
+γdone being the tolerant-completion multiplier, the push is accepted as complete to avoid irrelevant reposi-
+tioning.
+36
+=== PAGE 38 ===
+5.3 Camera localisation and dead reckoning
+The controller of Section 5.2 does not need a continuously updated object position to maintain contact:
+the force channel already provides that information, on the physical channel, independently of vision. This
+suggests a deliberately minimal perception scheme, closer to what a single fixed camera can realistically
+provide once the manipulator starts occluding its own view of the object: one noisy localisation, captured
+before the push begins, rather than a continuous tracking pipeline running throughout the interaction.
+Before settling on an explicit camera model, a cheaper alternative was considered: inferring the object’ s
+position purely from the end-effector’ s own kinematics, since the sphere’ s position is always known exactly
+and its offset from the object’ s surface is known by construction once contact is established. This proxy
+turns out to be structurally blind to the lateral centering term of Eq. (5.10). If the sphere itself has drifted
+laterally by some amount, the proxy inherits exactly that same drift, so the lateral errorε lat computed from
+it cancels by construction regardless of how misaligned the true contact actually is. A kinematic proxy can
+track where the pusher is, but not whether the pusher is where it should be relative to the object, which is
+precisely what the lateral centering term needs to know.
+Camera model.The object’ s position is sampled at the start of the push, by a synthetic camera model that
+reproduces realistic noise on that single measurement,
+ˆp=p true(t0)+η,η∼N(0,σ 2I2), (5.18)
+where ˆpis the measured planar object position,p true(t0) is the true object position at capture timet 0,ηis
+the additive measurement-noise vector,N(0,σ 2I2) is a zero-mean isotropic Gaussian distribution,σis the
+position-noise standard deviation, andI 2 is the two-dimensional identity matrix.
+Termination criterion.The primary termination criterion of Section 5.2,∥ ˆp−g∥ <d done, compares the
+perceived object position ˆpwith the goalg, usingd done as the completion-distance threshold. Once ˆpis
+frozen, this distance no longer evolves. This motivates the dead-reckoning criterion of Eq. (5.17), which
+uses the sphere’ s kinematic progress and the push distance planned from the initial camera capture.
+Limitation.The dead-reckoning distance in Eq. (5.17) is planned once, at the moment the push begins. If
+contact is lost and the controller re-plans through the repositioning, the plan used for dead reckoning must
+be refreshed consistently with the new approach, or the termination criterion would silently keep using a
+distance computed from the object’ s much earlier position. This is handled at the implementation level by
+refreshing the planned direction and distance in the repositioning routine as well as in the initial approach,
+so that the criterion of Eq. (5.17) remains valid after a reposition and not only for a push that never loses
+contact.
+37
+=== PAGE 39 ===
+5.4 Controller parameter values
+Table 5.1 centralises all numerical values used by the planner, controller, contact estimator, termination
+logic, and camera model. The preceding equations therefore define only the structure of the control laws
+and refer to the symbols listed here.
+These values fall into three groups according to how they were obtained. A first group is imposed by the
+hardware and the scene: the joint torque limitsτ max come from the manipulator model, and the pushing
+and approach heights follow from the table geometry. A second group is fixed by an argument given else-
+where in this work: the sphere radiusrwas chosen to be smaller or equal to the cube’ s side and the cylinder
+radius, the success thresholdd done sits above the waypoint tolerance of the Cartesian position controller,
+the contact stiffnessK c sets the scale of the geometric estimate of Eq. (5.8), and the three filter coefficients
+βf ,D ˆd andΘ o are ordered by the timescale of the disturbance each one addresses (Sections 5.2.1 and 5.2.2):
+milliseconds for the contact force, about a second for the desired direction, and several seconds for the ob-
+ject’ s own rotation.
+The remaining group, the feedback gains, was tuned by hand. Each gain was adjusted on a single nom-
+inal configuration until the push converged without oscillation, and then held fixed for the simulations. No
+parameter was re-tuned per shape, mass, friction coefficient or initial position, so the performance differ-
+ences reported there reflect the behaviour of one fixed setting.
+38
+=== PAGE 40 ===
+Symbol Value Unit Description
+r0.05 m Sphere radius
+zpush 0.10 m Pushing height (sphere center)
+zapproach 0.50 m Approach clearance height
+Vpush 0.06 m/s Nominal push speed
+Vcreep 0.008 m/s Minimum speed near the goal
+dbrake 0.35 m Distance at which braking begins
+Kc 700 N/m Geometric contact stiffness
+Fmin 0.05 N Contact detection threshold
+Fmax 30 N Admittance saturation threshold
+βf 0.30 – Force-filter coefficient
+D ˆd 0.08 – Desired-direction filter coefficient
+Θo 0.05 – Cube-yaw filter coefficient
+KF 0.15 – Force-direction gain
+KC 0.10 – Lateral-offset gain
+Klat 1.5 s −1 Lateral-centering gain
+Vdamp 0.8 – Excess-velocity damping gain
+γv 3 – Hard velocity-cap multiplier
+Kz,p 0.3 s −1 Vertical position gain
+Kz,d 0.04 – Vertical damping gain
+Vz,max 0.01 m/s Maximum vertical speed
+Kp,pos 400 N/m Cartesian position gain
+Kd,pos 80 N s/m Cartesian damping gain
+Kv 600 N s/m Velocity-impedance gain
+ddone 25 mm Success threshold
+γdone 2 – Tolerant-completion multiplier
+Tnc 5.0 s No-contact timeout
+σ3 mm Camera-position noise standard deviation
+τmax (87,87, 87,87,12, 12,12) N m Joint torque limits
+Table 5.1: Numerical parameter values used by the controller and perception model.
+39
+=== PAGE 41 ===
+6
+Results
+This chapter evaluates the controller and camera model of Chapter 5 in five steps: a cross-check of the
+simulation’ s contact physics against the analytic Coulomb prediction, a systematic benchmark across object
+shape, mass, friction, and initial position, an analysis of the two dominant failure modes uncovered during
+that campaign and of the fix each motivated, an ablation isolating the contribution of the two corrective
+terms and an evaluation of robustness to degraded perception. The pictures of the robot pushing the two
+objects can be observed on Fig 6.1.
+6.1 Evaluation protocol
+Both object shapes (cube, cylinder) are evaluated across four masses (0.5, 1.0, 1.5,2.0kg), three object-side
+friction coefficients (µ∈{0.3, 0.5,0.7}, against a fixed table friction of 0.5), and the two initial position/goal
+pairs A and B of Table 6.1, for a total of 48 runs. Positions C and D of the same table are used only for the
+ablation of Section 6.5. The cube has a side length of 100 mm and the cylinder has a radius and a height of
+100 mm.
+Table 6.1: Initial-position / goal pairs used in the benchmark and ablation studies. Positions A and B define
+the benchmark grid; positions C and D are used for the controller-component ablation.
+Position Object (x,y) [m] Goal (x,y) [m] Angle to nearest cube face axis
+A (0.35, 0.10) (0.55, 0.20)∼27 ◦
+B (0.30, 0.10) (0.55, 0.05)∼11 ◦
+C (0.35, 0.05) (0.55, 0.00)∼14 ◦
+D (0.35, 0.05) (0.55, 0.20)∼37 ◦
+Success criterion.A run is successful if the object’ s final distance to the goal is belowd done =25 mm. This
+value was chosen to stay above the 20 mm waypoint tolerance that already bounds the Cartesian position
+controller’ s own precision elsewhere in the FSM, and it remains small relative to the tested objects (about
+25% of the cylinder’ s radius and the cube’ s side).
+40
+=== PAGE 42 ===
+(a) Robot pushing the cube.
+ (b) Robot pushing the cylinder.
+Figure 6.1: Drake simulation scenes for the two object geometries evaluated in the benchmark.
+Metrics.For every run, the following are recorded: success (binary), final distance to goal, completion
+time, the fraction of pushing time during which contact was confirmed directly by Drake, and the mean/maximum
+lateral deviation of the object’ s trajectory from the theoretical straight line joining its start position to the
+goal.
+6.2 Physical validation
+Before trusting any controller-level result, the simulation’ s contact physics were cross-checked against the
+analytic Coulomb friction prediction. For two surfaces in contact, Drake combines the two friction co-
+efficients via the harmonic mean of Eq. (4.21) so that the theoretical steady-state sliding friction force is
+Ft heor y =µ c m g. For a table friction of 0.5 and an object friction of 0.3,µ c =0.375; for a 2 kg object this gives
+Ft heor y =7.36N, against 6-9 N observed directly from Drake’ sContactResultsduring steady sliding, which
+is a useful sanity check that the physics engine’ s contact model behaves as expected before ascribing any
+subsequent deviation to the controller itself rather than to the simulation. This cross-check was also what
+revealed that the default simulation time step over-estimated contact forces by a factor of 2 or 3, motivating
+the finer 10−4 s step used throughout the rest of this chapter.
+6.2.1 Force and speed validation
+Figure 6.2a shows that the steady-state contact force scales with mass as predicted: the observed plateau
+is approximately 1.7-2.9 N for the 0.5 kg object, 3.5-4 N for the 1.0 kg object, and 7-8 N for the 2.0 kg object,
+closely tracking the theoretical values of 1.84 N, 3.68 N, and 7.36 N respectively (dotted lines). This confirms
+that the contact-force channel reproduces the analytically predicted force scale, and therefore that the force
+direction driving Eq. (5.6) is physically meaningful. All three runs additionally show a brief, shared drop in
+contact force at approximately the same point in the push (around 35–45 mm from the target), coinciding
+with a measurable reversal in the object’ s own yaw. This is related to the near-goal instability described in
+Section 6.4.1: as the object approaches the acceptance region, the desired direction ˆdchanges more rapidly,
+41
+=== PAGE 43 ===
+and even with the low-pass filter of (5.5) in place, a brief transient in contact force and object rotation re-
+mains. Notably, the amplitude of the yaw excursion decreases sharply with mass (approximately 34 ◦, 20◦,
+and 9◦ for the 0.5, 1.0, and 2.0 kg objects respectively), explained by the larger rotational inertiaIzz =mc 2 of
+the heavier objects resisting the same frictional torque more effectively.
+The velocity profiles in Figure 6.2b show the same qualitative shape across all three masses with a brief
+transient followed by the commanded braking decay but the heavier objects converge more slowly toward
+the commanded push speed at a given time since contact, consistent with their larger inertia. The 0.5 kg
+object additionally exhibits a visible high-frequency oscillation in both its force and velocity traces (around
+1-2 s and 5 s after contact) that is absent for the heavier objects; since the contact stiffnessK normal is held
+fixed across all three runs, the natural frequency of the contact scales as
+p
+Knormal/m, making the lightest
+object more susceptible to contact chatter.
+42
+=== PAGE 44 ===
+(a) Contact-force magnitude. The dotted lines indicate the theoretical steady-state valuesF theory =
+µc mg
+(b) Object-speed magnitude during the same pushes.
+Figure 6.2: Contact force and object velocity versus time since first contact for the cylinder atµ=0.3 and
+three object masses.
+6.3 Systematic benchmark results
+The full grid of 48 runs is summarised in Table 6.2, aggregated over the two initial positions. The complete
+per-run results appear in Appendix A.1. Because the two positions correspond to different push orienta-
+tion, they are also reported separately in Table 6.3, which isolates the effect that Section 6.4.1 identifies as
+the dominant driver of cube performance. The cylinder, having no discrete-face constraint, serves as the
+baseline for comparison throughout.
+The complete results of all 48 individual benchmark runs are reported in Appendix A, Table A.1.
+43
+=== PAGE 45 ===
+Table 6.2: Benchmark results over the full grid: success rate and mean final distance to the goal, per shape,
+object-side friction, and mass. Each cell aggregates the two initial positions A and B of Table 6.1.
+Shapeµ0.5 kg 1.0 kg 1.5 kg 2.0 kg
+Cube
+0.3 100 % / 25 mm 100 % / 25 mm 100 % / 25 mm 100 % / 25 mm
+0.5 50 % / 35 mm 50 % / 36 mm 100 % / 25 mm 0 % / 32 mm
+0.7 50 % / 34 mm 50 % / 33 mm 0 % / 31 mm 0 % / 42 mm
+Cylinder
+0.3 100 % / 25 mm 100 % / 25 mm 100 % / 25 mm 0 % / 29 mm
+0.5 100 % / 25 mm 100 % / 25 mm 0 % / 31 mm 0 % / 37 mm
+0.7 100 % / 25 mm 100 % / 25 mm 0 % / 34 mm 0 % / 45 mm
+Each cell: success rate over the two positions / mean final distance. A successful run is censored atd done =25 mm by construction
+(see below), so 25 mm denotes a run that stopped where it was asked to.
+Table 6.3: Effect of initial obliquity, averaged over all masses and friction coefficients. Position A requires a
+push direction∼27 ◦ from the nearest cube face axis, position B only∼11 ◦.
+Cube Cylinder
+Metric A (∼27 ◦) B (∼11 ◦) A B
+Success rate 5/12 (41 %) 9/12 (75 %) 7/12 (58 %) 7/12 (58 %)
+Mean final distance [mm] 33.9 27.3 29.0 29.4
+Mean lateral deviation [mm] 31.3 9.6 10.6 5.9
+Max lateral deviation [mm] 72.9 34.7 27.6 14.1
+Because the termination criterion and the success criterion share the same thresholdddone, the final dis-
+tance of a successful run is censored at that value by construction: it indicates that the controller stopped
+where it was asked to, not how accurately it could have placed the object. Discrimination between success-
+ful runs therefore rests on completion time and lateral deviation rather than on final distance.
+The contact-force channel is available for 97% of the push on average, ranging from 80% to 100% across
+the grid, the remainder being covered by the geometric fallback of Eq. (5.8). The controller therefore acts on
+directly measured contact force for nearly the entire interaction, the fallback intervening only during brief
+separations.
+Cylinder:The cylinder succeeds in all 12 runs at 0.5 and 1.0 kg. At 1.5 kg it succeeds only atµ=0.3, and at
+2.0 kg only at that same friction level, giving 14 successes out of 24 overall and 7/12 at each of the two posi-
+tions. Performance is therefore governed by mass and friction, with no dependence on the initial obliquity.
+This follows from the mechanics of Section 4.1.5: because the contact normal is recomputed at every tick
+from the filtered desired direction, the push direction is never structurally misaligned with the goal, what-
+ever the obliquity. The limiting factor is the force and torque demand of the heavy object. Figures 6.3 and
+6.4 complement these numerical results with the corresponding cylinder trajectories.
+44
+=== PAGE 46 ===
+(a)m=0.5 kg,µ=0.3.
+ (b)m=2.0 kg,µ=0.7.
+Figure 6.3: Representative cylinder trajectories at position B for a light, low-friction object and a heavy, high-
+friction object. The nominal case reaches the acceptance region, whereas the heavy-object run follows a
+more curved path and stops substantially farther from the target. Because both mass and friction change
+between panels, this figure provides a qualitative contrast between nominal and demanding conditions.
+Figure 6.4: Representative trajectory of the 2.0 kg cylinder atµ=0.3. The trajectory approaches the accep-
+tance region but terminates just outside the 25 mm success threshold, as reported in Table 6.2.
+Cube:The cube succeeds in 14 of 24 runs, and its failures follow a different pattern. Atµ=0.3, it succeeds
+in all eight runs, across every mass and both positions. Failures appear only atµ≥0.5, and at 0.5 and 1.0 kg
+they occur exclusively at position A, the high-obliquity geometry. Accuracy is also not monotonic in mass:
+atµ=0.5 and position A, the maximum lateral deviation falls steadily from 78.6mm at 0.5 kg to 65.4 mm
+at 2.0 kg, and the cube succeeds at both positions at 1.5 kg before failing before failing at both positions
+at 2.0 kg. A heavier object resists the parasitic torque of Eq. (4.7) better, since the inertiaI zz =mc 2 grows
+with mass while the off-centre normal force does not; the two effects act in opposite directions, and their
+crossover sets the operating envelope.
+6.4 Failure modes
+The torque bounds of Section 4.2.1 place a hard limit on what the arm can deliver against a heavy, high-
+friction object. This section examines the two failure modes actually observed in the campaign of Sec-
+45
+=== PAGE 47 ===
+tion 6.3, the near-goal directional instability and the divergence it can trigger, and documents the fix each
+motivated.
+6.4.1 Instability near the goal
+Mechanism.Figures 6.5a and 6.6 compare the same object (0.5 kg,µ=0.3) pushed from position A (∼27 ◦
+obliquity) and position B (∼11 ◦). Both trajectories show the same qualitative signature: the object is first
+displaced almost purely along thex-axis, with little or no progress toward the goal alongy, before cor-
+recting toward the target only in the second half of the push. This two-phase, “dog-leg” shape is a direct
+consequence of the force-feedback correction of (5.6). At the start of contact on a flat face, the measured
+contact force is nearly normal to that face, i.e. aligned with the frozen face axis rather than with the instan-
+taneous goal directionθ d . The resulting angular deviationδ f =θ f −θ d is therefore approximately equal in
+magnitude to the obliquity itself, and the correction term (K F +1)δ f actively pulls the commanded direc-
+tionawayfrom the goal and toward the face normal. Only once sliding or rotation has built up a measurable
+tangential force component doesθ f move enough for the correction to stop opposing progress alongy, by
+which point the object has typically already accumulated a substantial, unwanted yaw. This is the opposite
+of the cylinder’ s behaviour (Section 6.3), where the tracked contact normal is never structurally misaligned
+with the goal in the first place, so the same force-feedback law does not fight the desired direction.
+This is a direct consequence of combining the reactive force-feedback law of (5.6) with the cube’ s frozen
+discrete face axis: the two design choices are individually well-justified, but their interaction degrades
+sharply once the required push direction exceeds roughly 30 ◦ from the nearest face axis, consistent with
+the failure pattern observed across the benchmark grid.
+Friction analysisThe dog-leg shape is present at both friction levels, but its consequences differ sharply.
+Comparing Figures 6.5a and 6.5b (same mass and position,µ=0.3 vs.µ=0.7) shows that the higher-friction
+case accumulates substantially more unwanted rotation and, in this instance, diverges(Section 6.4.2). This
+follows directly from the torque relation of (4.7),τ o ≈ −p y fn: the normal forcef n required merely to over-
+come table friction scales with the Coulomb predictionF theory =µ c m g, whereµ c is the harmonic-mean
+friction combining the object and table coefficients. For the 0.5 kg case,µc(0.3)≈0.375 givesF theory ≈1.84 N,
+whileµ c(0.7)≈0.583 givesF theory ≈2.86 N, a 55% increase. Since the parasitic torque scales directly withf n
+for a given lateral offsetp y , the same imperfection in lateral centering produces proportionally more un-
+wanted rotation at higher friction, independently of any change in obliquity. A secondary effect compounds
+this: a higher object-sideµalso raises the pusher-object frictionµ p of the friction cone ((4.20)), allowing a
+larger tangential forcef t before slipping. The full torque expression of (4.6),τ o =a f t −p y fn, retains only
+the second term under the assumption thatf t stays small (Section 4.1.4); atµ=0.7 this assumption holds
+less well, and the neglecteda f t term becomes a second, uncorrected source of rotation. Both effects push
+in the same direction, which follows from the qualitative ranking observed across all tested combinations:
+46
+=== PAGE 48 ===
+performance degrades with obliquity, and independently degrades further with friction, with the two effects
+compounding at position A/B andµ=0.7.
+(a) Position A (∼27 ◦),µ=0.3.
+ (b) Position A (∼27 ◦),µ=0.7.
+Figure 6.5: Effect of friction on the cube trajectory for the same mass and initial geometry (0.5 kg, position
+A):µ=0.3 (left) andµ=0.7 (right). Higher friction produces greater curvature and slower convergence
+toward the acceptance region.
+Figure 6.6: Cube push at position B (∼11 ◦ obliquity), withm=0.5 kg andµ=0.3. Compared with the
+position A case in Figure 6.5a, the lower-obliquity trajectory requires less correction before approaching the
+target.
+6.4.2 Stall / regression
+The interaction described above can, in the worst case, produce a run that does not merely fail to converge
+but actively diverges: once the object overshoots close to the goal and the desired direction reverses, the
+speed profile of Eq. (5.12) reacts only to the magnitude of the remaining distance, not to the sign of progress.
+As the object moves away and the distance grows again, the profile ramps back toward fullV push exactly as
+if a new push were beginning, rather than signalling a regression. This behaviour was also observed under
+camera-based perception in an earlier campaign (0.5 kg cube,µ=0.7: final distance 52.45 mm), before the
+47
+=== PAGE 49 ===
+safety-net described below was wired in.
+Figure 6.7 shows this effect for the 0.5 kg cube withµ=0.7 at position A, with the stall/regression safety-
+net disabled. The object initially moves toward the target and loops around its neighbourhood, but the
+controller does not recognise that subsequent motion is increasing the goal distance. The velocity profile
+therefore rises again and continues to drive the object away, ending approximately 890 mm from the target.
+The stall-detection mechanism is intended for exactly this situation. It tracks the best distance achieved
+and triggers a reposition when no measurable progress occurs for 4 s; if the object is already within 2×ddone,
+completion can instead be accepted consistently with the tolerance defined in Section 6.1. With the safety
+net enabled, the identically configured run terminates after 13.6 s at 43.0 mm from the goal (Appendix A.1).
+The run still misses the acceptance region, since position A atµ=0.7 is one of the configurations for which
+the cube fails under perfect perception, but the divergence is removed: the final error drops from approxi-
+mately 890 mm to 43 mm. The safety net does not make a hard configuration succeed; it prevents an unre-
+coverable one.
+Figure 6.7: Divergent trajectory of the 0.5 kg cube withµ=0.7 at position A when the stall/regression safety-
+net is disabled. The object first approaches and passes around the target neighbourhood, then moves pro-
+gressively farther away because renewed growth of the goal distance is interpreted by the speed profile as a
+reason to accelerate.
+6.5 Lateral centering contribution
+To isolate the individual contribution of the two corrective terms of Sections 5.2.4 and 5.2.1, the lateral
+centering gainK lat (Eq. (5.10)) and the direction low-pass filterD ˆd (Eq. (5.5)) were disabled independently
+48
+=== PAGE 50 ===
+on a 0.25 kg object atµ=0.3. This object is lighter than any object in the benchmark grid, so the rotational
+drift of Section 6.4.1 is more pronounced. The two ablation geometries are positions C, with approximately
+14◦ obliquity, and D, with approximately 37 ◦ obliquity, of Table 6.1. Both are evaluated using the ground-
+truth object position, so that the comparison isolates the controller from any perception effect.
+For the cube, every condition succeeds at position C and fails at position D. The cube success rate is
+therefore 50 % for all three conditions and carries no discriminating information. The cylinder follows a
+different position-dependent pattern. Table 6.4 therefore reports the final distance separately for positions
+C and D.
+Table 6.4: Controller-component ablation: final distance to the goal [mm] for a 0.25 kg object atµ=0.3,
+reported separately for positions C and D of Table 6.1. Values at or below the 25 mm threshold correspond
+to successful runs.
+Cube Cylinder
+Condition C D C D
+Full controller (baseline) 25 39 45 25
+No direction filter (D ˆd =1) 25 38 42 25
+No lateral centering (Klat =0) 2510725 31
+At the low-obliquity position C, the three cube conditions are indistinguishable. All reach the accep-
+tance region and are censored atd done =25 mm. Neither corrective term is needed when the required cube
+push direction is already close to a face axis.
+At the high-obliquity position D, the cube separates the two terms clearly. Removing the direction filter
+changes the final distance only from 39 to 38 mm, a difference too small to interpret from one run per cell.
+Removing lateral centering degrades the final distance from 39 to 107mm, a factor of approximately 2.7, and
+produces the trajectory of Figure 6.8b. The object is driven almost purely alongx, misses the goal, and turns
+back toward it only after the pusher has travelled past the target neighbourhood. This is the mechanism of
+Section 6.4.1 with its main corrective channel removed. Lateral centering keeps the contact point aligned
+on the pushing face while the force-feedback correction opposes the initial obliquity-driven misalignment.
+Without it, the early drift is not corrected, and the frozen cube-face axis leaves the controller no other way
+to recover.
+The baseline itself does not succeed at position D, finishing 39mm from the goal against a 25 mm thresh-
+old. The ablation geometries were deliberately chosen at the difficult end of the obliquity range, where the
+contribution of each term is most visible. The comparison is therefore between a near miss and an outright
+miss, rather than between a success and a failure.
+The cylinder shows no comparable systematic dependence. Averaged over positions C and D, removing
+lateral centering reduces its mean final distance from approximately 35 to 28 mm. However, the position-
+specific effects are opposite: position C improves from 45 to 25 mm, whereas position D degrades from
+25 to 31mm. With only two runs per condition, this average difference is not meaningful. This weak and
+49
+=== PAGE 51 ===
+geometry-dependent response is consistent with the cylinder’ s axisymmetry: its contact point is fixed at
+radiusRby geometry, so it does not exhibit the same face-relative lateral offset as the cube.
+The absence of a measurable direction-filter effect also requires qualification. The filter acts on the
+rate of rotation of ˆd, and these ablation runs do not produce the rapid near-goal reversal that the filter was
+introduced to suppress. The filtered and unfiltered directions therefore remain similar throughout these
+trials. The absence of an effect in this ablation indicates that the test does not strongly excite the near-goal
+reversal regime of Section 6.4.1; it does not establish that the direction filter is unnecessary.
+(a) Full controller.
+ (b) No lateral centering.
+Figure 6.8: Cube trajectories for the high-obliquity ablation case (0.25 kg,µ=0.3, position D of Table 6.1):
+full controller (left) and lateral centering disabled (right). Removing lateral centering causes the trajectory
+to diverge from the goal.
+6.6 Robustness to perception
+The benchmark of Section 6.3 supplies the controller with the object’ s exact position at every control tick.
+This section relaxes that assumption in three stages, using the camera model of Section 5.3 (30 Hz, 80 ms
+latency,σ=3 mm): intermittent occlusion during contact, at frame loss probabilities of 50 % and 90 %, and
+the limiting case in which the object is localised once and never observed again, so that the controller falls
+back on the dead reckoning criterion of Eq. (5.17).
+All three levels are evaluated on the same eight configurations: both shapes, 0.5 and 1.0 kg,µ=0.3,
+positions A and B of Table 6.1. These eight were selected because the controller succeeds in every one of
+them under ground truth, so that any degradation observed here is attributable to the perception channel
+alone.
+6.6.1 Occlusion and frozen camera
+The three regimes are separated by two orders of magnitude in perception error (Table 6.5). Losing half
+the camera frames leaves a mean error of 4.0 mm between the perceived and the true object position; losing
+nine frames out of ten leaves 6.6 mm. Only when the estimate is frozen does the error reach 199.6 mm, since
+the object travels 200 to 250 mm while the belief remains at its initial value.
+50
+=== PAGE 52 ===
+This ordering follows from a simple bound. The error accumulated between two successful observations
+scales asv∆t, wherevis the object speed and∆tthe interval since the last valid frame. At the 60 mm/s push
+speed of Table 5.1 and a nominal 30 Hz frame rate, a frame loss probabilitypgives∆t≈(1/30)/(1−p), so
+thatp=0.9 still leaves∆t≈0.33 s and an error of roughly 20 mm at worst. The frozen case corresponds to
+p=1, where the bound diverges.
+The distinction matters for the practical relevance of the experiment. A real RGB-D pipeline, partially
+occluded by the manipulator during contact, operates in the intermittent regime. Permanent and complete
+loss of tracking is a singular case, not the expected behaviour of a camera whose view is obstructed for part
+of the push.
+6.6.2 Trajectory analysis
+At 50 % frame loss the mean lateral deviation from the straight line reference is 15.8 mm, identical to the
+15.8 mm measured under ground truth. The path the object follows is indistinguishable from the nominal
+one, as Figure 6.9 shows. Yet none of the eight runs is scored a success: all eight stop between 26.9 and
+32.1 mm from the goal, a narrow band just outside the 25 mm acceptance radius.
+(a) Ground truth, 25.0 mm.
+ (b) 50 % frame loss, 27.1 mm.
+Figure 6.9: Effect of 50 % frame loss on a nominal configuration (cylinder, 1.0 kg,µ=0.3, position B). The
+pushed trajectory follows the same path in both cases; averaged over the eight configurations, the mean
+lateral deviation is 15.8 mm with and without occlusion. Only the stopping point differs: the occluded run
+terminates 2.1 mm outside the acceptance radius because the termination test is evaluated on the perceived
+position, shown in purple, which carries a mean error of 4.0 mm.
+The explanation is in the termination criterion, not in the control law. The primary completion test of
+Section 5.2 compares theperceiveddistance to the goal againstd done. With a perception error of 4 mm, that
+distance can read below 25 mm while the true distance is 28 mm, and the controller stops in the belief that
+it has arrived. The terminal error is therefore the acceptance threshold plus the perception error, which is
+what the measurements give: 25+4≈28.4 mm observed on average.
+Under degraded perception the controller does not push less accurately. It stops less accurately. The
+binary success rate cannot express that distinction, which is why Table 6.5 reports the lateral deviation and
+51
+=== PAGE 53 ===
+the median final distance alongside it.
+Four of the eight runs succeed at 90 % occlusion and the median final distance is 25.8 mm, marginally
+better than at 50 %. A staler estimate makes the braking profile of Eq. (5.12) over-estimate the remaining
+distance, so the object is carried slightly further before the controller stops.
+The mean, however, rises to 59.5 mm. It is dominated by two cube runs at position A, which finish 82
+and 248 mm from the goal; the remaining six runs average 24.3 mm. Those two are the high obliquity cube
+configurations, where the frozen face axis of Section 5.2.2 is already the limiting factor under perfect per-
+ception (Section 6.4.1). Stale perception and initial obliquity compound: each is survivable alone, and their
+combination is not. Figure 6.10 contrasts the two shapes at identical mass, friction, position and occlusion
+level.
+(a) Cylinder, 24.4 mm.
+ (b) Cube, 247.9 mm.
+Figure 6.10: Shape asymmetry under 90 % frame loss at high obliquity (1.0 kg,µ=0.3, position A). The cylin-
+der reaches the acceptance region, while the cube diverges to 248 mm. The continuously re-evaluated con-
+tact normal of Section 4.1.5 keeps the cylinder’ s push direction aligned with the goal whatever the obliquity,
+whereas the cube’ s frozen face axis offers no mechanism to recover once the early drift has gone uncor-
+rected.
+Mean and median must be read together here. The success rate alone would suggest, misleadingly, that
+90 % occlusion is more benign than 50 %.
+6.6.3 Limits
+When the estimate is never refreshed, one of the eight runs succeeds and the mean final distance reaches
+45.9 mm. The controller continues along the direction planned from the initial capture, and the dead reck-
+oning criterion of Eq. (5.17) terminates the push on the pusher’ s own displacement. That criterion keeps
+the motion bounded, and no run diverges, but it cannot correct the positional error accumulated in the
+meantime.
+One effect works in the opposite direction. Because dead reckoning does not test the perceived distance,
+the final distance of a completed run is no longer censored atd done, and the successful run finishes at
+52
+=== PAGE 54 ===
+22.4 mm instead of stopping at the threshold.
+Table 6.5: Effect of degraded perception on the eight configurations common to all campaigns (cube and
+cylinder, 0.5 and 1.0 kg,µ=0.3, positions A and B). Perception error is the mean distance between the per-
+ceived and the true object position over the push. Mean and median final distance diverge at 90 % occlusion
+because two high obliquity cube runs dominate the mean.
+Ground truth 50 % occl. 90 % occl. Frozen
+Success rate 8/8 0/8 4/8 1/8
+Mean final distance [mm] 25.0 28.4 59.5 45.9
+Median final distance [mm] 25.0 28.1 25.8 42.7
+Mean completion time [s] 15.5 16.4 19.4 9.0
+Mean perception error [mm] 0.0 4.0 6.6 199.6
+Max perception error [mm] 0 16 99 259
+Mean lateral deviation [mm] 15.8 15.8 28.3 38.0
+Sensor availability [%] 93 83 90 90
+6.6.4 Summary
+Three results follow from this campaign. First, the controller tolerates the loss of most visual observations
+without any degradation of the pushed trajectory: at 50 % frame loss the lateral deviation is exactly the
+ground truth value. Second, the residual failures at that level are an artefact of evaluating the stopping
+condition on a noisy measurement, and not a loss of control authority; wideningd done by the expected
+perception error, or requiring the condition to hold over several consecutive frames, would recover most of
+them without touching the control law. Third, what the controller does not tolerate is the combination of
+stale perception with high initial obliquity on a flat faced object, which is the same coupling identified in
+Section 6.4.1 and is not specific to the perception channel.
+53
+=== PAGE 55 ===
+7
+Conclusion
+7.1 Summary
+This thesis investigated whether goal-directed planar pushing can be performed reliably by a single robotic
+arm fitted with a spherical end-effector, using the direction of the measured contact force as the sole feed-
+back signal about the interaction, without any model of the object’ s dynamics. A reactive, impedance-
+based controller was designed around this estimate, implemented as a finite-state machine (approach,
+push, reposition, done) and augmented with two corrective terms,lateral centering and direction filtering,
+together with a camera-based perception model and a stall/regression safety net. The approach was vali-
+dated in a Drake-based physics simulation across a benchmark grid spanning object shape, mass, friction,
+and initial contact obliquity.
+7.2 Main findings
+Several conclusions can be drawn from the results presented in Chapter 6.
+First, the controller converges reliably to the target region across most of the tested grid, with the main
+failure modes concentrated in high-obliquity, high-friction configurations, where the parasitic torque of
+Eq. (4.6) is largest (Section 6.4).
+Second, the ablation study of Section 6.5 shows that the individual controller components do not con-
+tribute equally across object shapes. Disabling lateral centering degrades the cube’ s final position error from
+39 mm to 107 mm, confirming that this correction is necessary to correct the orientation-dependent con-
+tact drift specific to a flat-faced object. The same ablation produces a much smaller effect for the cylinder
+(35 mm vs. 30 mm), consistent with its axisymmetric geometry, which does not generate the same lateral
+drift. Direction filtering, by contrast, produced no measurable difference on the tested configuration (Ta-
+ble 6.4). Direction filtering produced no measurable difference here, though the ablation configurations do
+not enter the near-goal regime the filter was designed for.
+Third, the stall/regression safety net addresses a real and previously undetected failure mode of the con-
+troller: without it, a push that overshoots near the goal can diverge indefinitely, because the velocity profile
+54
+=== PAGE 56 ===
+reacts only to the magnitude of the remaining distance and not to the sign of progress (Section 6.4.2). Under
+an identical configuration, enabling the safety net converts this divergent run into a better completion.
+Fourth, the perception experiments of Section 6.6 separate two effects that a binary success rate con-
+flates. Losing half or even nine tenths of the camera frames leaves the pushed trajectory unchanged, the
+mean lateral deviation at 50% frame loss is 15.8 mm, exactly the ground-truth value, while shifting the stop-
+ping point by the magnitude of the perception error, since the termination test is evaluated on the perceived
+position. Only when the estimate is frozen for the entire push does performance collapse, and even then
+the dead-reckoning fallback keeps every run bounded. The controller therefore does not require continuous
+tracking to push accurately; it requires it to stop accurately.
+7.3 Contributions
+The main contributions of this thesis can be summarised as follows.
+1. An adaptation of reactive force-feedback pushing control, previously validated on an omnidirectional
+mobile base, whose end-effector can translate freely in the plane, to an arm-mounted spherical pusher
+on a 7-DoF manipulator, where the reachable workspace, the joint torque limits, and the need for an
+explicit approach and repositioning phase all constrain the push. The adaptation includes a shape-
+dependent contact normal that has no equivalent in the original formulation
+2. A finite-state reactive controller combining this estimate with lateral-centering and direction-filtering
+corrections, together with a stall/regression safety net that recovers from an otherwise unrecoverable
+divergence mode.
+3. A camera perception model (latency, noise, and contact-induced occlusion) with a dead-reckoning
+fallback, allowing the controller to complete a push without continuous object tracking.
+4. A systematic benchmark and ablation study quantifying the individual contribution of each controller
+component across object shape, mass, friction, and obliquity, and showing that this contribution is
+shape-dependent.
+7.4 Limitations
+The validation presented in this thesis is entirely in simulation. While Drake’ s contact model is physically
+grounded, it does not capture every aspect of a real robot: actuator dynamics, force estimation from actual
+joint torques rather than an idealised penetration measurement, real camera hardware, and unmodelled
+compliance in the arm and end-effector could all affect the results reported here. The benchmark grid, while
+covering a meaningful range of mass, friction, and obliquity, was limited to two object shapes (cube and
+cylinder) and to quasi-static pushing; the controller’ s behaviour under faster pushes, non-convex objects,
+55
+=== PAGE 57 ===
+or cluttered environments with multiple obstacles remains untested. Finally, the camera perception model
+used here, though intended to be representative of a real RGB-D pipeline’ s error characteristics, is itself
+simulatedk.
+7.5 Future work
+Several directions follow naturally from these limitations. The most immediate is hardware validation on
+a physical arm, where the contact-force channel assumed here would be supplied by real hardware,a wrist
+force/torque sensor or a tactile fingertip. Integrating a real-time RGB-D perception pipeline in place of the
+simulated camera model would test whether the robustness observed here under simulated noise and oc-
+clusion transfers to real sensing conditions. The benchmark could be extended to additional object shapes,
+including non-convex and irregular geometries, and to scenarios involving multiple objects or obstacles.
+Finally, the scenario-dependent effect of direction filtering observed during this work suggests a concrete
+open question: characterising, analytically or empirically, the class of push trajectories for which this term
+is beneficial versus counterproductive, so that it could eventually be applied adaptively.
+56
+=== PAGE 58 ===
+A
+Complete benchmark results
+Table A.1: Complete benchmark: all 48 individual runs, using the ground-truth (Drake) object position.
+Shape Pos.m[kg]µSuccess Time [s] Final [mm] Lat. max [mm] Sensor [%]
+Cube A 0.5 0.3 Yes 12.21 25.0 61.5 97.2
+Cube B 0.5 0.3 Yes 14.98 24.9 30.5 94.7
+Cube A 0.5 0.5 No – 45.5 78.6 90.5
+Cube B 0.5 0.5 Yes 15.32 24.9 36.6 93.4
+Cube A 0.5 0.7 No – 43.0 95.9 98.1
+Cube B 0.5 0.7 Yes 17.08 25.0 40.9 97.0
+Cube A 1.0 0.3 Yes 17.50 25.0 60.6 98.6
+Cube B 1.0 0.3 Yes 20.03 25.0 25.2 98.4
+Cube A 1.0 0.5 No – 46.1 75.4 98.9
+Cube B 1.0 0.5 Yes 24.66 25.0 36.9 98.9
+Cube A 1.0 0.7 No – 40.9 90.7 98.4
+Cube B 1.0 0.7 Yes 29.12 25.0 47.2 99.2
+Cube A 1.5 0.3 Yes 25.46 25.0 57.8 99.2
+Cube B 1.5 0.3 Yes 26.20 25.0 25.6 99.0
+Cube A 1.5 0.5 Yes 39.71 25.0 69.9 99.4
+Cube B 1.5 0.5 Yes 35.82 25.0 36.4 99.4
+Cube A 1.5 0.7 No – 32.6 85.6 99.5
+Cube B 1.5 0.7 No – 28.8 42.6 99.4
+Cube A 2.0 0.3 Yes 34.39 25.0 53.9 99.4
+Cube B 2.0 0.3 Yes 34.10 25.0 27.1 99.2
+Cube A 2.0 0.5 No – 30.8 65.4 99.5
+Cube B 2.0 0.5 No – 32.3 33.6 99.5
+Cube A 2.0 0.7 No – 42.3 80.1 99.5
+Cube B 2.0 0.7 No – 42.2 34.1 99.4
+Cylinder A 0.5 0.3 Yes 10.80 25.0 26.0 81.3
+Cylinder B 0.5 0.3 Yes 13.75 25.0 29.8 80.3
+Cylinder A 0.5 0.5 Yes 12.49 25.0 35.6 93.2
+Continued on the next page
+57
+=== PAGE 59 ===
+Table A.1 continued from the previous page
+Shape Pos.m[kg]µSuccess Time [s] Final [mm] Lat. max [mm] Sensor [%]
+Cylinder B 0.5 0.5 Yes 14.40 25.0 19.9 87.4
+Cylinder A 0.5 0.7 Yes 13.23 25.0 40.9 95.3
+Cylinder B 0.5 0.7 Yes 17.42 25.0 15.7 92.8
+Cylinder A 1.0 0.3 Yes 15.97 25.0 21.2 98.6
+Cylinder B 1.0 0.3 Yes 18.38 25.0 13.1 94.8
+Cylinder A 1.0 0.5 Yes 22.46 25.0 30.4 98.8
+Cylinder B 1.0 0.5 Yes 25.24 25.0 12.3 93.4
+Cylinder A 1.0 0.7 Yes 29.17 25.0 33.3 99.3
+Cylinder B 1.0 0.7 Yes 32.54 25.0 10.6 98.6
+Cylinder A 1.5 0.3 Yes 26.75 25.0 23.2 99.3
+Cylinder B 1.5 0.3 Yes 28.80 25.0 10.5 97.4
+Cylinder A 1.5 0.5 No – 31.0 26.1 99.4
+Cylinder B 1.5 0.5 No – 30.8 14.1 98.8
+Cylinder A 1.5 0.7 No – 33.3 27.7 99.5
+Cylinder B 1.5 0.7 No – 33.9 13.0 99.0
+Cylinder A 2.0 0.3 No – 29.0 21.4 99.4
+Cylinder B 2.0 0.3 No – 29.3 8.3 98.5
+Cylinder A 2.0 0.5 No – 35.9 22.4 99.6
+Cylinder B 2.0 0.5 No – 38.4 11.7 99.1
+Cylinder A 2.0 0.7 No – 44.0 23.0 99.6
+Cylinder B 2.0 0.7 No – 45.8 10.6 99.1
+Completion time is reported only for runs meeting the 25 mm success criterion. “Sensor” is the fraction of the push over which the
+contact-force channel was available, the remainder being covered by the geometric fallback of Eq. (5.8).
+58
+=== PAGE 60 ===
+Bibliography
+[1] Russ Tedrake and the Drake Development Team.Drake: Model-Based Design and Verification for
+Robotics. Online. Available athttps://drake.mit.edu. 2019.
+[2] RoboDK.Franka Emika Panda Robot. RoboDK.URL:https://robodk.com/robot/Franka/Emika-
+Panda(visited on 08/07/2026).
+[3] Ivan Mehta and Rebecca Bellan.Runway Releases Its First World Model, Adds Native Audio to Latest
+Video Model. TechCrunch, republished by Yahoo Tech. Dec. 11, 2025.URL:https://tech.yahoo.
+com/ai/meta-ai/articles/runway-releases-first-world-model-170000394.html(visited
+on 08/06/2026).
+[4] Matthew T . Mason. “Mechanics and Planning of Manipulator Pushing Operations”. In:The Interna-
+tional Journal of Robotics Research5.3 (1986), pp. 53–71.DOI:10.1177/027836498600500303.
+[5] Kevin M. Lynch and Matthew T . Mason. “Stable Pushing: Mechanics, Controllability, and Planning”.
+In:The International Journal of Robotics Research15.6 (1996), pp. 533–556.DOI:10.1177/027836499601500602.
+[6] Suresh Goyal, Andy Ruina, and Jim Papadopoulos. “Planar Sliding with Dry Friction. Part 1: Limit
+Surface and Moment Function”. In:Wear143.2 (1991), pp. 307–330.
+[7] Michael Posa, Cecilia Cantu, and Russ Tedrake. “A Direct Method for Trajectory Optimization of Rigid
+Bodies Through Contact”. In:The International Journal of Robotics Research33.1 (2014), pp. 69–81.
+DOI:10.1177/0278364913506757.
+[8] Mehmet R. Dogar and Siddhartha S. Srinivasa. “A Framework for Push-Grasping in Clutter”. In:Robotics:
+Science and Systems (RSS). 2011.DOI:10.15607/RSS.2011.VII.009.
+[9] Francois R. Hogan and Alberto Rodriguez. “Reactive Planar Non-Prehensile Manipulation with Hy-
+brid Model Predictive Control”. In:The International Journal of Robotics Research39.7 (2020), pp. 755–
+773.
+59
+=== PAGE 61 ===
+[10] Chelsea Finn and Sergey Levine. “Deep Visual Foresight for Planning Robot Motion”. In:Proceedings
+of the IEEE International Conference on Robotics and Automation (ICRA). arXiv:1610.00696. 2017.DOI:
+10.1109/ICRA.2017.7989324.
+[11] John Lloyd and Nathan F . Lepora. “Goal-Driven Robotic Pushing Using Tactile and Proprioceptive
+Feedback”. In:IEEE Robotics and Automation Letters6.2 (2021). arXiv:2012.01859, pp. 2176–2183.
+[12] Kevin M. Lynch, Hajime Maekawa, and Kazuo Tanie. “Manipulation and Active Sensing by Pushing
+Using Tactile Feedback”. In:Proceedings of the IEEE/RSJ International Conference on Intelligent Robots
+and Systems (IROS). 1992, pp. 416–421.DOI:10.1109/IROS.1992.587370.
+[13] Gaotian Wang, Kejia Ren, and Kaiyu Hang. “UNO Push: Unified Nonprehensile Object Pushing via
+Non-Parametric Estimation and Model Predictive Control”. In:arXiv preprint arXiv:2403.13274(2024).
+URL:https://arxiv.org/abs/2403.13274.
+[14] Nils Dengler, David Großklaus, and Maren Bennewitz. “Learning Model-Based Control for Non-Prehensile
+Manipulation”. In:arXiv preprint arXiv:2203.02389(2023).URL:https://arxiv.org/abs/2203.
+02389.
+[15] Sebastian Dengler, Tim Welschehold, and Oliver Brock. “Deep Reinforcement Learning for Contact-
+Rich Manipulation”. In:Proceedings of the IEEE/RSJ International Conference on Intelligent Robots and
+Systems (IROS). 2022, pp. 10473–10480.
+[16] Yuzhe Qin et al. “A Universal Pushing Controller for Object Delivery Using Vision-Based Reinforce-
+ment Learning”. In:arXiv preprint(2024).
+[17] Neville Hogan. “Impedance Control: An Approach to Manipulation”. In:Journal of Dynamic Systems,
+Measurement, and Control107.1 (1985), pp. 1–7.DOI:10.1115/1.3140702.
+[18] Luigi Villani and Joris De Schutter. “Force Control”. In:Springer Handbook of Robotics. Springer, 2008,
+pp. 161–185.DOI:10.1007/978-3-540-30301-5_8.
+[19] Adam Heins and Angela P . Schoellig.Force Push: Robust Single-Point Pushing with Force Feedback.
+IEEE Robotics and Automation Letters 9(8):6856–6863, 2024. 2024.URL:https://arxiv.org/pdf/
+2401.17517.
+[20] Alessandro De Luca et al. “Collision Detection and Safe Reaction with the DLR-III Lightweight Ma-
+nipulator Arm”. In:Proceedings of the IEEE/RSJ International Conference on Intelligent Robots and
+Systems (IROS). 2006, pp. 1623–1630.DOI:10.1109/IROS.2006.282053.
+[21] Lucas Manuelli and Russ Tedrake. “Localizing External Contact Using Proprioceptive Sensors: The
+Contact Particle Filter”. In:Proceedings of the IEEE/RSJ International Conference on Intelligent Robots
+and Systems (IROS). 2016, pp. 5062–5069.DOI:10.1109/IROS.2016.7759743.
+[22] Paul J. Besl and Neil D. McKay. “A Method for Registration of 3-D Shapes”. In:IEEE Transactions on
+Pattern Analysis and Machine Intelligence14.2 (1992), pp. 239–256.DOI:10.1109/34.121791.
+60
+=== PAGE 62 ===
+[23] Stefan Hinterstoisser et al. “Model Based Training, Detection and Pose Estimation of Texture-Less
+3D Objects in Heavily Cluttered Scenes”. In:Asian Conference on Computer Vision (ACCV). Vol. 7724.
+2012.DOI:10.1007/978-3-642-33885-4_60.
+[24] Yu Xiang et al. “PoseCNN: A Convolutional Neural Network for 6D Object Pose Estimation in Cluttered
+Scenes”. In:Robotics: Science and Systems (RSS). arXiv:1711.00199. 2018.DOI:10.15607/RSS.2018.
+XIV.019.
+[25] Chen Wang et al. “DenseFusion: 6D Object Pose Estimation by Iterative Dense Fusion”. In:Proceed-
+ings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)(2019), pp. 3343–
+3352.DOI:10.1109/CVPR.2019.00346.
+[26] Jeannette Bohg et al. “Interactive Perception: Leveraging Action in Perception and Perception in Ac-
+tion”. In:IEEE Transactions on Robotics33.6 (2017). arXiv:1604.03670, pp. 1273–1291.DOI:10.1109/
+TRO.2017.2721939.
+61
